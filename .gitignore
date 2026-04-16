@@ -1,0 +1,41 @@
+# OS/editor junk
+.DS_Store
+Thumbs.db
+__MACOSX/
+
+# Python
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.venv/
+venv/
+ENV/
+env/
+
+# Node / Vite
+**/node_modules/
+**/dist/
+**/.vite/
+
+# Logs
+*.log
+
+# Large model artifacts (do NOT commit to GitHub)
+colorization-app/backend/model/*.caffemodel
+colorization-app/backend/model/*.onnx
+colorization-app/backend/model/*.task
+colorization-app/backend/model/*.pth
+colorization-app/backend/model/*.pt
+
+# Local outputs / uploads
+colorization-app/backend/input.jpg
+colorization-app/backend/output.jpg
+colorization-app/backend/*_input.*
+colorization-app/backend/_smoke_*
+colorization-app/backend/_preset_*
+colorization-app/backend/_ai_*
+colorization-app/backend/_frame_*
+colorization-app/backend/_m2_*
+

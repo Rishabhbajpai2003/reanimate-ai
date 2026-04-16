@@ -1,0 +1,136 @@
+\documentclass[10pt,twocolumn,letterpaper]{article}
+
+% NOTE:
+% Use the official CVPR 2024 template in your submission.
+% This skeleton is content-complete and easy to port into the official template.
+
+\usepackage[margin=0.75in]{geometry}
+\usepackage{times}
+\usepackage{helvet}
+\usepackage{courier}
+\usepackage{graphicx}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{enumitem}
+
+\title{ReAnimateAI: Intelligent Portrait Restoration Framework\\(Interim Report --- Engineering Track)}
+
+\author{
+Keyurkumar Desai (MT25071) \and
+Ishan Kumar (MT25069) \and
+Rishabh Bajpai (MT25079) \and
+Yash Kumar Saini (MT25054)
+}
+
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We present \textbf{ReAnimateAI}, an engineering-track system for restoring and re-animating degraded historical portrait photographs. Given a single portrait image, our system aims to remove degradations (noise, scratches, blur), improve resolution, colorize grayscale inputs, enhance facial fidelity, and optionally generate short animations with subtle facial motion (e.g., blinking). This interim report summarizes the problem scope, user interface progress, chosen baselines, datasets, evaluation metrics, early analyses, compute requirements, and task ownership.
+\end{abstract}
+
+\section{Track}
+\textbf{Engineering Track.}
+
+\section{(i) Problem Statement}
+\textbf{Problem.} Grayscale and degraded portrait images often suffer from multiple degradations, including noise, scratches, blurring, low resolution, and fading. The absence of color and motion reduces realism and expressive impact, while manual restoration is time-consuming and requires expertise.
+
+\textbf{Input.} A single portrait photograph (often grayscale and degraded), typically a JPEG/PNG scan.
+
+\textbf{Outputs.} (1) restored image, (2) super-resolved image, (3) colorized image, (4) face-enhanced image, and (5) an optional short animation clip with subtle facial motion.
+
+\textbf{User and interface.} The primary user is a non-expert (families/archivists/creators) who interacts with the system via a web interface to upload a portrait and receive outputs with downloadable results.
+
+\textbf{Scope constraints.} The system focuses on portraits and historical archival photographs. Animation is limited to subtle, realistic motion (blinking, slight head movement). Performance may degrade for extremely damaged images and non-portrait/group scenes.
+
+\section{(ii) User Interface \& Progress}
+\subsection{UI design}
+Our interface is a web application with an upload flow that displays intermediate and final outputs (restored, SR, colorized, face-enhanced) and supports downloads. The backend exposes a unified inference API with module-level toggles to enable/disable components during ablation and debugging.
+
+\subsection{Implementation tools}
+We develop in Python 3.10+ with PyTorch and OpenCV, using VSCode/Jupyter. The demo backend is implemented in Flask/FastAPI, and the frontend uses standard web technologies (HTML/CSS/JS; React-based UI is also supported).
+
+\subsection{Completed vs in-progress components}
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Completed:} Project scaffolding; baseline module integration (partial); initial UI flow (upload + display results).
+  \item \textbf{In progress:} Full pipeline orchestration; evaluation harness (metrics + logging); animation stabilization; robustness and error handling.
+\end{itemize}
+
+\section{(iii) Related Work}
+\textbf{Colorization baseline.} DeOldify-style GAN-based colorization provides a strong practical baseline for historical photo colorization but can hallucinate plausible yet incorrect colors and is sensitive to domain shifts present in archival scans.
+
+\textbf{Face restoration baselines.} Generative face restoration methods using facial priors (e.g., CodeFormer and related works) can recover facial details from heavy degradation but exhibit an identity--realism trade-off and may over-synthesize details not present in the original.
+
+\textbf{Animation baselines.} Motion transfer approaches such as First Order Motion Model (FOMM) and old-photo animation systems can animate still portraits but may introduce temporal flicker, warping, and identity drift, especially under uncertain keypoints or occlusions.
+
+\textbf{Baselines selected for our system.} We prioritize (i) DeOldify for colorization, (ii) CodeFormer/GFP-like priors for face restoration, and (iii) FOMM / CVPR'20 old-photo animation as initial baselines because they are widely used, have available implementations, and represent distinct methodological approaches aligned with our target outputs.
+
+\section{(iv) Datasets \& Evaluation Metrics}
+\subsection{Datasets}
+\begin{itemize}[leftmargin=*]
+  \item \textbf{ImageNet (subset):} Controlled evaluation by converting GT color images to grayscale and applying synthetic degradations for paired metrics.
+  \item \textbf{HumanFace8000 (Kaggle):} Portrait-focused testing for face enhancement and restoration.
+  \item \textbf{VoxCeleb2:} Diverse identities and facial motion content to test animation pipelines and robustness.
+  \item \textbf{Public-domain historical photo archive:} Real-world qualitative validation under strong domain shift.
+\end{itemize}
+
+\subsection{Evaluation metrics}
+\textbf{Restoration:} PSNR, SSIM, LPIPS.\\
+\textbf{Colorization:} PSNR/SSIM where GT is available; perceptual evaluation; small-scale human study.\\
+\textbf{Face enhancement:} identity preservation score; landmark consistency.\\
+\textbf{Animation:} temporal consistency; frame stability; identity preservation across frames.\\
+\textbf{System-level:} end-to-end inference time; GPU memory usage; FPS; module-wise latency breakdown.
+
+\subsection{Resource tracking}
+We record runtime and resource requirements including GPU VRAM usage (if applicable), RAM footprint, and storage for datasets and pretrained weights.
+
+\section{(v) Analysis of Results (Interim)}
+We report early qualitative results showing improvements in perceptual quality for degraded portraits. We also categorize failure cases:
+(i) heavy scratches/noise leading to residual artifacts or texture hallucination,
+(ii) color ambiguity causing desaturated or incorrect hues,
+(iii) identity drift in face enhancement, and
+(iv) temporal flicker/warping in animation.
+We hypothesize these stem from domain shift, ambiguity in luminance-to-chroma mapping, and instability in motion estimation under degradation.
+
+\section{(vi) Compute Requirements}
+Development targets Python 3.10+ with PyTorch and OpenCV. Minimum recommended hardware is 16GB RAM and an NVIDIA GPU with 8GB+ VRAM, with 20--30GB storage for datasets and pretrained models. To manage compute, we plan to use Colab Pro/Kaggle GPUs and/or institute servers when available.
+
+\section{(vii) Individual Tasks}
+\begin{table}[t]
+\centering
+\small
+\begin{tabular}{@{}p{0.17\linewidth}p{0.28\linewidth}p{0.45\linewidth}@{}}
+\toprule
+\textbf{Member} & \textbf{Ownership} & \textbf{Responsibilities} \\
+\midrule
+Keyurkumar & Restoration + eval & Integrate restoration baseline; define degradations; run PSNR/SSIM/LPIPS; failure taxonomy. \\
+Ishan & Super-resolution & Integrate SR baseline; benchmark latency/VRAM; ablations on scale factors. \\
+Rishabh & Colorization + UI & Integrate colorization baseline; UI output comparisons; human study setup (small-scale). \\
+Yash & Animation & Integrate FOMM/old-photo animation; stabilize motion; temporal metrics and identity across frames. \\
+\bottomrule
+\end{tabular}
+\caption{Interim task ownership and responsibilities.}
+\end{table}
+
+\section{(viii) Next Steps}
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Pipeline integration:} unify modules behind one API with toggles; consistent preprocessing and output formatting.
+  \item \textbf{Evaluation harness:} dataset splits, EDA stats, metric computation, and automatic report generation (tables/figures).
+  \item \textbf{Robustness:} input validation, file-size limits, error handling, and reproducible dependency setup.
+  \item \textbf{Animation improvements:} motion constraint for subtle realism; temporal smoothing; better identity preservation.
+\end{itemize}
+
+\section*{References (to be completed)}
+\begin{itemize}[leftmargin=*]
+  \item DeOldify-related review/implementation (e.g., arXiv:2101.04061; IPOL review).
+  \item CodeFormer: ``Towards Robust Blind Face Restoration with Codebook Lookup Transformer'' (NeurIPS).
+  \item GFP-related prior work (generative facial prior).
+  \item FOMM: ``First Order Motion Model for Image Animation'' (arXiv:2003.00196).
+  \item ``Bringing Old Photos Back to Life'' (CVPR 2020).
+\end{itemize}
+
+\end{document}
+
