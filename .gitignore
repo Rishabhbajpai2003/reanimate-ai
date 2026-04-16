@@ -33,9 +33,13 @@ colorization-app/backend/model/*.pt
 colorization-app/backend/input.jpg
 colorization-app/backend/output.jpg
 colorization-app/backend/*_input.*
+colorization-app/backend/*.gif
 colorization-app/backend/_smoke_*
 colorization-app/backend/_preset_*
 colorization-app/backend/_ai_*
 colorization-app/backend/_frame_*
 colorization-app/backend/_m2_*
+
+# Frontend stray assets
+colorization-app/frontend/cartoon_input.jpg
 
