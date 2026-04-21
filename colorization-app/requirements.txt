@@ -28,3 +28,5 @@ tqdm>=4.66.0
 requests>=2.31.0
 python-dotenv>=1.0.0
 mediapipe>=0.10.0
+imageio>=2.34.0
+imageio-ffmpeg>=0.4.9

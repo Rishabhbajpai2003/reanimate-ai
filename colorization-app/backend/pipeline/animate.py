@@ -21,9 +21,15 @@ TOTAL_FRAMES = int(FPS * DURATION_SEC)
 
 class AnimateModule:
     def __init__(self):
-        self._sadtalker_available = (
-            SADTALKER_DIR.exists() and (SADTALKER_DIR / "inference.py").exists()
-        )
+        # Improved detection with absolute path resolution for logging
+        exists = SADTALKER_DIR.exists()
+        inf_exists = (SADTALKER_DIR / "inference.py").exists()
+        self._sadtalker_available = exists and inf_exists
+        
+        if self._sadtalker_available:
+            logger.info("SadTalker integration ACTIVE (found at %s)", SADTALKER_DIR.absolute())
+        else:
+            logger.warning("SadTalker NOT FOUND (checked %s). Using static blink fallback.", SADTALKER_DIR.absolute())
 
         # New MediaPipe Tasks API (0.10.30+)
         self._model_path = str(MODEL_PATH) if MODEL_PATH.exists() else None
@@ -256,9 +262,15 @@ class AnimateModule:
 
             mp4_files = list(Path(result_dir).rglob("*.mp4"))
             if mp4_files:
-                shutil.move(str(mp4_files[0]), output_path)
-                return output_path
+                # Ensure output_path has .mp4 extension for clarity if it's a video
+                final_output = str(Path(output_path).with_suffix(".mp4"))
+                shutil.move(str(mp4_files[0]), final_output)
+                logger.info("SadTalker SUCCESS: Result saved to %s", final_output)
+                return final_output
+            
+            logger.warning("SadTalker finished but no MP4 was found in %s – falling back to static blink", result_dir)
+            return self._generate_static_blink_gif(img_path, output_path)
 
         except Exception as exc:
-            logger.error("SadTalker FAILED: %s", exc)
+            logger.error("SadTalker CRASHED: %s", exc, exc_info=True)
             return self._generate_static_blink_gif(img_path, output_path)
