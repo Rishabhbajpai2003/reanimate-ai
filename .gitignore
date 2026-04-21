@@ -30,10 +30,11 @@ colorization-app/backend/model/*.pth
 colorization-app/backend/model/*.pt
 
 # Local outputs / uploads
-colorization-app/backend/input.jpg
-colorization-app/backend/output.jpg
-colorization-app/backend/*_input.*
+colorization-app/backend/*.jpg
+colorization-app/backend/*.jpeg
+colorization-app/backend/*.png
 colorization-app/backend/*.gif
+colorization-app/backend/*_input.*
 colorization-app/backend/_smoke_*
 colorization-app/backend/_preset_*
 colorization-app/backend/_ai_*
@@ -42,4 +43,7 @@ colorization-app/backend/_m2_*
 
 # Frontend stray assets
 colorization-app/frontend/cartoon_input.jpg
+
+# Local scratch folders
+cv project/
 
