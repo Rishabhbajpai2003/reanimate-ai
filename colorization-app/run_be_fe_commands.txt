@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BACKEND_DIR="$ROOT_DIR/backend"
 FRONTEND_DIR="$ROOT_DIR/frontend"
+SADTALKER_DIR="$ROOT_DIR/SadTalker"
 
 BACKEND_PORT=5000
 FRONTEND_PORT=3000
@@ -11,11 +12,12 @@ FRONTEND_PORT=3000
 echo "==> Project root: $ROOT_DIR"
 
 # =========================
-# Kill ports safely
+# Kill ports and processes safely
 # =========================
-echo "==> Cleaning ports..."
+echo "==> Cleaning old processes..."
 lsof -ti tcp:$BACKEND_PORT | xargs kill -9 2>/dev/null || true
 lsof -ti tcp:$FRONTEND_PORT | xargs kill -9 2>/dev/null || true
+pgrep -f "python app.py" | xargs kill -9 2>/dev/null || true
 
 # =========================
 # Backend setup
@@ -28,13 +30,15 @@ if ! command -v python3.11 >/dev/null 2>&1; then
   exit 1
 fi
 
-if [ ! -d ".venv" ]; then
-  echo "==> Creating virtual environment"
-  python3.11 -m venv .venv
-fi
+echo "==> Recreating virtual environment"
+rm -rf .venv
+python3.11 -m venv .venv
 
 echo "==> Installing Python dependencies"
 .venv/bin/python -m pip install --upgrade pip
+.venv/bin/pip install setuptools wheel
+# Install basicsr from git to avoid the PyPI build error (KeyError: '__version__')
+.venv/bin/pip install git+https://github.com/XPixelGroup/BasicSR.git@master
 .venv/bin/pip install -r ../requirements.txt
 
 # =========================
@@ -42,32 +46,8 @@ echo "==> Installing Python dependencies"
 # =========================
 echo "==> Setting up models..."
 
-mkdir -p models/{colorize,gfpgan,realesrgan,codeformer}
-
-# Colorization
-echo "→ Colorization"
-.venv/bin/python download_models.py --colorize
-
-# GFPGAN
-echo "→ GFPGAN"
-if [ ! -f models/gfpgan/GFPGANv1.4.pth ]; then
-  curl -L -o models/gfpgan/GFPGANv1.4.pth \
-  https://github.com/TencentARC/GFPGAN/releases/download/v1.4/GFPGANv1.4.pth
-fi
-
-# RealESRGAN
-echo "→ RealESRGAN"
-if [ ! -f models/realesrgan/RealESRGAN_x4plus.pth ]; then
-  curl -L -o models/realesrgan/RealESRGAN_x4plus.pth \
-  https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth
-fi
-
-# CodeFormer
-echo "→ CodeFormer"
-if [ ! -f models/codeformer/codeformer.pth ]; then
-  curl -L -o models/codeformer/codeformer.pth \
-  https://github.com/sczhou/CodeFormer/releases/download/v0.1.0/codeformer.pth
-fi
+# Use the downloader script for everything to ensure consistency
+.venv/bin/python download_models.py --all
 
 # =========================
 # Install CodeFormer repo
@@ -82,6 +62,28 @@ fi
 echo "==> Installing CodeFormer deps"
 cd CodeFormer
 "$BACKEND_DIR/.venv/bin/pip" install -r requirements.txt || true
+# =========================
+# Install SadTalker repo
+# =========================
+cd "$ROOT_DIR"
+
+if [ ! -d "SadTalker" ]; then
+  echo "==> Cloning SadTalker"
+  git clone https://github.com/OpenTalker/SadTalker.git
+fi
+
+# Install all Python dependencies in a single pass to resolve conflicts cleanly
+echo "==> Installing Python dependencies (this may take a minute)..."
+"$BACKEND_DIR/.venv/bin/pip" install wheel packaging
+"$BACKEND_DIR/.venv/bin/pip" install git+https://github.com/XPixelGroup/BasicSR.git@master
+"$BACKEND_DIR/.venv/bin/pip" install -r "$SADTALKER_DIR/requirements.txt"
+"$BACKEND_DIR/.venv/bin/pip" install -r "$ROOT_DIR/requirements.txt"
+
+# Patch: Copy missing CodeFormer archs to the venv's basicsr
+echo "==> Patching basicsr with CodeFormer archs"
+cd "$ROOT_DIR/CodeFormer"
+cp -v basicsr/archs/codeformer_arch.py "$BACKEND_DIR/.venv/lib/python3.11/site-packages/basicsr/archs/"
+cp -v basicsr/archs/vqgan_arch.py "$BACKEND_DIR/.venv/lib/python3.11/site-packages/basicsr/archs/"
 
 # =========================
 # Frontend setup
@@ -91,33 +93,37 @@ cd "$FRONTEND_DIR"
 npm install
 
 # =========================
-# Environment safety
+# Environment variables
 # =========================
 export HF_HUB_OFFLINE=1
 export TORCH_HOME="$BACKEND_DIR/models"
+export PYTHONPATH="$BACKEND_DIR"
 
 # =========================
 # Run services
 # =========================
 echo "==> Starting backend"
 cd "$BACKEND_DIR"
-nohup .venv/bin/python app.py > "$ROOT_DIR/backend.log" 2>&1 &
+# Use a fresh log file and ensure it exists
+cat /dev/null > "$ROOT_DIR/backend.log"
+nohup .venv/bin/python app.py >> "$ROOT_DIR/backend.log" 2>&1 &
 
 echo "==> Starting frontend"
 cd "$FRONTEND_DIR"
 nohup npm run dev -- --host 0.0.0.0 --port $FRONTEND_PORT > "$ROOT_DIR/frontend.log" 2>&1 &
 
-sleep 5
-
-# =========================
-# Health check
-# =========================
-echo "==> Checking backend health"
-if curl -s "http://localhost:$BACKEND_PORT/api/health" >/dev/null; then
-  echo "✅ Backend is healthy"
-else
-  echo "⚠️ Backend did not respond (check logs)"
-fi
+echo "==> Waiting for backend to initialize (this may take a while)..."
+MAX_RETRIES=24 # Increase to 120 seconds (5s * 24)
+COUNT=0
+until curl -s "http://localhost:$BACKEND_PORT/api/health" > /dev/null; do
+    sleep 5
+    COUNT=$((COUNT + 1))
+    echo "  ...still waiting ($((COUNT * 5))s)"
+    if [ $COUNT -ge $MAX_RETRIES ]; then
+        echo "⚠️ Backend did not respond after 120s (check backend.log)"
+        break
+    fi
+done
 
 echo "==> DONE"
 echo "Frontend: http://localhost:$FRONTEND_PORT"

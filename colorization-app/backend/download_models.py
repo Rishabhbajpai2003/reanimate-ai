@@ -53,9 +53,61 @@ MODELS = {
         "dest": MODELS_DIR / "codeformer.pth",
         "desc": "CodeFormer face enhancement",
     },
+    "face_landmarker": {
+        "url":  "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task",
+        "dest": MODELS_DIR / "face_landmarker.task",
+        "desc": "MediaPipe Face Landmarker (v2)",
+    },
+    # SadTalker models
+    "sadtalker_256": {
+        "url":  "https://github.com/OpenTalker/SadTalker/releases/download/v0.0.2-rc/SadTalker_V0.0.2_256.safetensors",
+        "dest": Path(__file__).parent.parent / "SadTalker" / "checkpoints" / "SadTalker_V0.0.2_256.safetensors",
+        "desc": "SadTalker 256 model",
+    },
+    "sadtalker_512": {
+        "url":  "https://github.com/OpenTalker/SadTalker/releases/download/v0.0.2-rc/SadTalker_V0.0.2_512.safetensors",
+        "dest": Path(__file__).parent.parent / "SadTalker" / "checkpoints" / "SadTalker_V0.0.2_512.safetensors",
+        "desc": "SadTalker 512 model",
+    },
+    "sadtalker_mapping_109": {
+        "url":  "https://github.com/OpenTalker/SadTalker/releases/download/v0.0.2-rc/mapping_00109-model.pth.tar",
+        "dest": Path(__file__).parent.parent / "SadTalker" / "checkpoints" / "mapping_00109-model.pth.tar",
+        "desc": "SadTalker mapping 109",
+    },
+    "sadtalker_mapping_229": {
+        "url":  "https://github.com/OpenTalker/SadTalker/releases/download/v0.0.2-rc/mapping_00229-model.pth.tar",
+        "dest": Path(__file__).parent.parent / "SadTalker" / "checkpoints" / "mapping_00229-model.pth.tar",
+        "desc": "SadTalker mapping 229",
+    },
+    "sadtalker_alignment": {
+        "url":  "https://github.com/xinntao/facexlib/releases/download/v0.1.0/alignment_WFLW_4HG.pth",
+        "dest": Path(__file__).parent.parent / "SadTalker" / "gfpgan" / "weights" / "alignment_WFLW_4HG.pth",
+        "desc": "SadTalker face alignment",
+    },
+    "sadtalker_detection": {
+        "url":  "https://github.com/xinntao/facexlib/releases/download/v0.1.0/detection_Resnet50_Final.pth",
+        "dest": Path(__file__).parent.parent / "SadTalker" / "gfpgan" / "weights" / "detection_Resnet50_Final.pth",
+        "desc": "SadTalker face detection",
+    },
+    "sadtalker_parsing": {
+        "url":  "https://github.com/xinntao/facexlib/releases/download/v0.2.2/parsing_parsenet.pth",
+        "dest": Path(__file__).parent.parent / "SadTalker" / "gfpgan" / "weights" / "parsing_parsenet.pth",
+        "desc": "SadTalker face parsing",
+    },
+    "sadtalker_bfm": {
+        "url":  "https://github.com/Winfredy/SadTalker/releases/download/v0.0.2/BFM_Fitting.zip",
+        "dest": Path(__file__).parent.parent / "SadTalker" / "checkpoints" / "BFM_Fitting.zip",
+        "desc": "SadTalker BFM fitting models",
+    },
 }
 
 # ─── Download Helpers ─────────────────────────────────────────────────────────
+
+def _unzip(path: Path, dest_dir: Path):
+    import zipfile
+    print(f"   Unzipping {path} to {dest_dir} …")
+    with zipfile.ZipFile(path, 'r') as zip_ref:
+        zip_ref.extractall(dest_dir)
 
 def _progress(blocks_done, block_size, total_size):
     if total_size <= 0:
@@ -83,8 +135,11 @@ def download(key: str):
     print(f"   Source  : {url}")
     print(f"   Dest    : {dest}")
     try:
+        dest.parent.mkdir(parents=True, exist_ok=True)
         urllib.request.urlretrieve(url, str(dest), reporthook=_progress)
         print(f"\n  ✓ Saved → {dest}")
+        if dest.suffix == ".zip":
+            _unzip(dest, dest.parent)
     except Exception as exc:
         print(f"\n  ✗ FAILED: {exc}")
         if dest.exists():
@@ -99,6 +154,7 @@ def main():
     parser.add_argument("--gfpgan",      action="store_true", help="GFPGAN restoration")
     parser.add_argument("--realesrgan",  action="store_true", help="Real-ESRGAN x2 + x4")
     parser.add_argument("--codeformer",  action="store_true", help="CodeFormer enhancement")
+    parser.add_argument("--animate",     action="store_true", help="MediaPipe Face Landmarker")
     args = parser.parse_args()
 
     if not any(vars(args).values()):
@@ -124,6 +180,17 @@ def main():
 
     if args.all or args.codeformer:
         download("codeformer")
+
+    if args.all or args.animate:
+        download("face_landmarker")
+        download("sadtalker_256")
+        download("sadtalker_512")
+        download("sadtalker_mapping_109")
+        download("sadtalker_mapping_229")
+        download("sadtalker_alignment")
+        download("sadtalker_detection")
+        download("sadtalker_parsing")
+        download("sadtalker_bfm")
 
     print("\n══════════════════════════════════════════")
     print("  Done! Start the server: python app.py")

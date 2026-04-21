@@ -1,12 +1,15 @@
-"""
-Pipeline Controller — orchestrates all restoration modules sequentially.
-"""
-
+import sys
 import time
 import logging
 from pathlib import Path
 from typing import Any, Optional, Dict
 
+# ─── Monkeypatching & Compatibility Fixes ─────────────────────────────────────
+# 1. Fix torchvision compatibility for basicsr (0.15+)
+import torchvision.transforms.functional as tf_f
+sys.modules['torchvision.transforms.functional_tensor'] = tf_f
+
+# 2. Fix torch.load for newer versions (2.0+)
 import torch
 _original_load = torch.load
 def _safe_load(*args, **kwargs):
@@ -15,6 +18,7 @@ def _safe_load(*args, **kwargs):
     return _original_load(*args, **kwargs)
 torch.load = _safe_load
 
+# ─── Pipeline Imports ─────────────────────────────────────────────────────────
 from .restore   import RestoreModule
 from .super_res import SuperResModule
 from .colorize  import ColorizeModule
