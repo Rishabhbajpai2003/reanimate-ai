@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Stop ReAnimateAI backend/frontend servers.
+# Run from project root with:
+# bash "stop_servers_commands.txt"
+
+BACKEND_PORT=5000
+FRONTEND_PORT=3000
+
+echo "==> Stopping servers on ports $BACKEND_PORT and $FRONTEND_PORT..."
+lsof -ti tcp:$BACKEND_PORT | xargs kill -9 2>/dev/null || true
+lsof -ti tcp:$FRONTEND_PORT | xargs kill -9 2>/dev/null || true
+
+echo "==> Stopping any leftover common dev processes..."
+pkill -f "python app.py" 2>/dev/null || true
+pkill -f "vite --host 0.0.0.0 --port 3000" 2>/dev/null || true
+pkill -f "npm run dev" 2>/dev/null || true
+
+echo "==> Verify ports are free"
+if lsof -nP -iTCP:$BACKEND_PORT -sTCP:LISTEN >/dev/null 2>&1; then
+  echo "Port $BACKEND_PORT is still in use"
+else
+  echo "Port $BACKEND_PORT is free"
+fi
+
+if lsof -nP -iTCP:$FRONTEND_PORT -sTCP:LISTEN >/dev/null 2>&1; then
+  echo "Port $FRONTEND_PORT is still in use"
+else
+  echo "Port $FRONTEND_PORT is free"
+fi
+
+echo "==> Done."
+

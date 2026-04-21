@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Run this whole file from the project root:
+# /Users/yashkumarsaini/IIITD/CV/Project/cv project/reanimateai
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BACKEND_DIR="$ROOT_DIR/backend"
+FRONTEND_DIR="$ROOT_DIR/frontend"
+BACKEND_PORT=5000
+FRONTEND_PORT=3000
+
+echo "==> Project root: $ROOT_DIR"
+
+echo "==> Killing any process on ports $BACKEND_PORT and $FRONTEND_PORT (if running)..."
+lsof -ti tcp:$BACKEND_PORT | xargs kill -9 2>/dev/null || true
+lsof -ti tcp:$FRONTEND_PORT | xargs kill -9 2>/dev/null || true
+
+echo "==> Backend setup (Python 3.11 venv + deps)"
+cd "$BACKEND_DIR"
+
+if ! command -v python3.11 >/dev/null 2>&1; then
+  echo "ERROR: python3.11 not found. Install Python 3.11 first."
+  exit 1
+fi
+
+if [ ! -d ".venv" ]; then
+  python3.11 -m venv .venv
+fi
+
+.venv/bin/python -m pip install --upgrade pip
+.venv/bin/pip install -r ../requirements.txt
+
+echo "==> Ensuring colorization models are available"
+.venv/bin/python download_models.py --colorize
+
+echo "==> Frontend setup (npm deps)"
+cd "$FRONTEND_DIR"
+npm install
+
+echo "==> Starting backend on http://localhost:$BACKEND_PORT"
+cd "$BACKEND_DIR"
+nohup .venv/bin/python app.py > "$ROOT_DIR/backend.log" 2>&1 &
+
+echo "==> Starting frontend on http://localhost:$FRONTEND_PORT"
+cd "$FRONTEND_DIR"
+nohup npm run dev -- --host 0.0.0.0 --port $FRONTEND_PORT > "$ROOT_DIR/frontend.log" 2>&1 &
+
+sleep 3
+
+echo "==> Health check backend"
+curl -s "http://localhost:$BACKEND_PORT/api/health" || true
+echo
+
+echo "==> Done."
+echo "Frontend: http://localhost:$FRONTEND_PORT"
+echo "Backend : http://localhost:$BACKEND_PORT"
+echo "Logs    : $ROOT_DIR/backend.log and $ROOT_DIR/frontend.log"

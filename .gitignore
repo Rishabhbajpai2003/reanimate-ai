@@ -1,49 +1,69 @@
-# OS/editor junk
+# =========================
+# OS / Editor junk
+# =========================
 .DS_Store
 Thumbs.db
 __MACOSX/
 
+# =========================
 # Python
+# =========================
+__pycache__/
 **/__pycache__/
-*.pyc
+*.py[cod]
 *.pyo
 *.pyd
 .Python
+
+# Virtual environments
 .venv/
 venv/
-ENV/
 env/
+ENV/
 
-# Node / Vite
+# =========================
+# Node / Frontend
+# =========================
+node_modules/
 **/node_modules/
+dist/
 **/dist/
+.vite/
 **/.vite/
 
+# npm / yarn logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# =========================
+# ML / Model files
+# =========================
+models/
+*.pth
+*.pt
+*.onnx
+*.caffemodel
+*.prototxt
+*.safetensors
+*.task
+
+# =========================
 # Logs
+# =========================
 *.log
 
-# Large model artifacts (do NOT commit to GitHub)
-colorization-app/backend/model/*.caffemodel
-colorization-app/backend/model/*.onnx
-colorization-app/backend/model/*.task
-colorization-app/backend/model/*.pth
-colorization-app/backend/model/*.pt
+# =========================
+# Images / generated files
+# =========================
+*.jpg
+*.jpeg
+*.png
+*.gif
 
-# Local outputs / uploads
-colorization-app/backend/*.jpg
-colorization-app/backend/*.jpeg
-colorization-app/backend/*.png
-colorization-app/backend/*.gif
-colorization-app/backend/*_input.*
-colorization-app/backend/_smoke_*
-colorization-app/backend/_preset_*
-colorization-app/backend/_ai_*
-colorization-app/backend/_frame_*
-colorization-app/backend/_m2_*
-
-# Frontend stray assets
-colorization-app/frontend/cartoon_input.jpg
-
-# Local scratch folders
-cv project/
-
+*_input.*
+_smoke_*
+_preset_*
+_ai_*
+_frame_*
+_m2_*
