@@ -21,6 +21,13 @@ const DEFAULT_OPTIONS = {
   super_res: true,
   enhance:   true,
   animate:   false,
+  sr_compare: false,
+}
+
+const DEFAULT_SR_MODELS = {
+  realesrgan: true,
+  swinir: true,
+  hat: true,
 }
 
 export default function App() {
@@ -31,6 +38,7 @@ export default function App() {
   const [result,    setResult]    = useState(null)
   const [steps,     setSteps]     = useState([])
   const [health,    setHealth]    = useState(null)
+  const [srModels,  setSrModels]  = useState(DEFAULT_SR_MODELS)
 
   // ── Health check on mount ──────────────────────────────────────────────
   useEffect(() => {
@@ -59,7 +67,14 @@ export default function App() {
     setResult(null)
     setSteps([])
     try {
-      const data = await processImage(file, options)
+      const selectedSrModels = Object.entries(srModels)
+        .filter(([, enabled]) => enabled)
+        .map(([model]) => model)
+
+      const data = await processImage(file, {
+        ...options,
+        sr_models: selectedSrModels,
+      })
       setResult(data)
       setSteps(data.steps ?? [])
       toast.success('Portrait restored successfully! 🎉', { className: 'toast-custom' })
@@ -149,7 +164,12 @@ export default function App() {
           {/* Options Panel */}
           <div className="card options-panel" id="options-card">
             <div className="card-title"><span>⚙️</span> Pipeline Options</div>
-            <OptionsPanel options={options} onChange={setOptions} />
+            <OptionsPanel
+              options={options}
+              onChange={setOptions}
+              srModels={srModels}
+              onSrModelsChange={setSrModels}
+            />
           </div>
 
           {/* Loader (replaces result while processing) */}

@@ -5,7 +5,7 @@ Pipeline Controller — orchestrates all restoration modules sequentially.
 import time
 import logging
 from pathlib import Path
-from typing import Any, Optional, Dict
+from typing import Any, Optional, Dict, List
 
 from .restore   import RestoreModule
 from .super_res import SuperResModule
@@ -35,7 +35,7 @@ class PipelineController:
         input_path: str,
         output_dir: str,
         job_id: str,
-        options: Dict[str, bool],
+        options: Dict[str, Any],
         audio_path: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
@@ -49,11 +49,14 @@ class PipelineController:
         current_path = input_path
         steps: list[dict] = []
         intermediates: dict[str, str] = {}
+        sr_compare_outputs: dict[str, dict] = {}
+
+        sr_compare = bool(options.get("sr_compare", False) and options.get("super_res", True))
+        sr_models: List[str] = options.get("sr_models") or ["realesrgan"]
 
         stages = [
             ("restore",   options.get("restore",   True),  self.restore_mod),
             ("colorize",  options.get("colorize",  True),  self.colorize_mod),
-            ("super_res", options.get("super_res", True),  self.super_res_mod),
             ("enhance",   options.get("enhance",   True),  self.enhance_mod),
         ]
 
@@ -77,6 +80,73 @@ class PipelineController:
                 latency = round(time.perf_counter() - t0, 3)
                 logger.warning("  ✗ %s FAILED (%.3fs): %s — using previous output", step_name, latency, exc)
                 steps.append({"step": step_name, "latency_s": latency, "skipped": False, "error": str(exc)})
+
+        # ── Super resolution (single or compare mode) ───────────────────────
+        if not options.get("super_res", True):
+            steps.append({"step": "super_res", "latency_s": 0, "skipped": True})
+            logger.info("Skipping super_res")
+        elif sr_compare:
+            logger.info("Running super_res compare for models: %s", ", ".join(sr_models))
+            t0 = time.perf_counter()
+            try:
+                sr_outputs = self.super_res_mod.process_compare(
+                    input_path=current_path,
+                    output_dir=output_dir,
+                    job_id=job_id,
+                    model_names=sr_models,
+                )
+                compare_latency = round(time.perf_counter() - t0, 3)
+
+                default_model = "realesrgan" if "realesrgan" in sr_outputs else next(iter(sr_outputs))
+                default_filename = sr_outputs[default_model]["filename"]
+                current_path = str(Path(output_dir) / default_filename)
+
+                for model_name, info in sr_outputs.items():
+                    step_name = f"super_res:{model_name}"
+                    steps.append({
+                        "step": step_name,
+                        "latency_s": info.get("latency_s", compare_latency),
+                        "skipped": False,
+                        "backend": info.get("backend", "unknown"),
+                    })
+                    inter_key = f"super_res_{model_name}"
+                    intermediates[inter_key] = info["filename"]
+                    sr_compare_outputs[model_name] = {
+                        "filename": info["filename"],
+                        "backend": info.get("backend", "unknown"),
+                        "latency_s": info.get("latency_s", 0),
+                    }
+                    if "error" in info:
+                        sr_compare_outputs[model_name]["error"] = info["error"]
+
+                logger.info("  ✓ super_res compare done in %.3fs", compare_latency)
+            except Exception as exc:
+                compare_latency = round(time.perf_counter() - t0, 3)
+                logger.warning("  ✗ super_res compare FAILED (%.3fs): %s", compare_latency, exc)
+                steps.append({"step": "super_res", "latency_s": compare_latency, "skipped": False, "error": str(exc)})
+        else:
+            logger.info("Running super_res …")
+            t0 = time.perf_counter()
+            try:
+                out_filename = f"{job_id}_super_res.png"
+                out_path = str(Path(output_dir) / out_filename)
+                sr_model = (sr_models[0] if sr_models else "realesrgan")
+                sr_result = self.super_res_mod.process(current_path, out_path, model_name=sr_model)
+                current_path = sr_result["output_path"]
+                latency = round(time.perf_counter() - t0, 3)
+                steps.append({
+                    "step": "super_res",
+                    "latency_s": latency,
+                    "skipped": False,
+                    "model": sr_result.get("model", sr_model),
+                    "backend": sr_result.get("backend", "unknown"),
+                })
+                intermediates["super_res"] = out_filename
+                logger.info("  ✓ super_res done in %.3fs → %s", latency, out_path)
+            except Exception as exc:
+                latency = round(time.perf_counter() - t0, 3)
+                logger.warning("  ✗ super_res FAILED (%.3fs): %s — using previous output", latency, exc)
+                steps.append({"step": "super_res", "latency_s": latency, "skipped": False, "error": str(exc)})
 
         # ── Animation (optional, produces GIF/MP4) ────────────────────────────
         animation_filename = None
@@ -114,4 +184,5 @@ class PipelineController:
             "animation_filename": animation_filename,
             "steps":              steps,
             "intermediates":      intermediates,
+            "sr_compare_outputs": sr_compare_outputs,
         }

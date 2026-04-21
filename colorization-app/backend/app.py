@@ -6,6 +6,7 @@ Production-ready portrait restoration API
 import os
 import time
 import uuid
+import json
 import logging
 from pathlib import Path
 from flask import Flask, request, jsonify, send_from_directory, url_for
@@ -14,6 +15,7 @@ from werkzeug.utils import secure_filename
 from werkzeug.exceptions import RequestEntityTooLarge
 
 from pipeline.main import PipelineController
+from pipeline.super_res import normalize_model_name
 
 # ─── Logging ──────────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -95,12 +97,40 @@ def upload():
         val = request.form.get(name, str(default)).lower()
         return val in ("true", "1", "yes", "on")
 
+    def parse_sr_models(raw: str):
+        if not raw:
+            return ["realesrgan"]
+
+        parsed = None
+        try:
+            parsed = json.loads(raw)
+        except Exception:
+            parsed = [p.strip() for p in raw.split(",") if p.strip()]
+
+        if isinstance(parsed, str):
+            parsed = [parsed]
+
+        if not isinstance(parsed, list):
+            parsed = ["realesrgan"]
+
+        seen = set()
+        canonical = []
+        for m in parsed:
+            key = normalize_model_name(str(m))
+            if key and key not in seen:
+                seen.add(key)
+                canonical.append(key)
+
+        return canonical or ["realesrgan"]
+
     options = {
         "restore":   flag("restore",   True),
         "super_res": flag("super_res", True),
         "colorize":  flag("colorize",  True),
         "enhance":   flag("enhance",   True),
         "animate":   flag("animate",   False),
+        "sr_compare": flag("sr_compare", False),
+        "sr_models": parse_sr_models(request.form.get("sr_models", "")),
     }
 
     # ── Save uploaded image ────────────────────────────────────────────────
@@ -151,6 +181,15 @@ def upload():
         "intermediates": {
             step: build_result_url(fname)
             for step, fname in result.get("intermediates", {}).items()
+        },
+        "sr_compare_outputs": {
+            model: {
+                "url": build_result_url(meta["filename"]),
+                "backend": meta.get("backend", "unknown"),
+                "latency_s": meta.get("latency_s", 0),
+                "error": meta.get("error"),
+            }
+            for model, meta in result.get("sr_compare_outputs", {}).items()
         },
     }
     return jsonify(response), 200

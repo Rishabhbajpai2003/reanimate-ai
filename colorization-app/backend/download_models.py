@@ -3,11 +3,10 @@
 download_models.py — downloads all pretrained model weights.
 
 Usage:
-    python download_models.py [--all] [--colorize] [--gfpgan] [--realesrgan] [--codeformer]
+    python download_models.py [--all] [--colorize] [--gfpgan] [--realesrgan] [--swinir] [--hat] [--codeformer]
 """
 
 import argparse
-import hashlib
 import os
 import sys
 import urllib.request
@@ -53,6 +52,11 @@ MODELS = {
         "dest": MODELS_DIR / "codeformer.pth",
         "desc": "CodeFormer face enhancement",
     },
+    "swinir_x2": {
+        "url":  "https://github.com/JingyunLiang/SwinIR/releases/download/v0.0/001_classicalSR_DF2K_s64w8_SwinIR-M_x2.pth",
+        "dest": MODELS_DIR / "001_classicalSR_DF2K_s64w8_SwinIR-M_x2.pth",
+        "desc": "SwinIR x2 (classical SR)",
+    },
 }
 
 # ─── Download Helpers ─────────────────────────────────────────────────────────
@@ -90,6 +94,41 @@ def download(key: str):
         if dest.exists():
             dest.unlink()
 
+
+def download_hat_checkpoint():
+    """Download HAT checkpoint from a user-provided URL.
+
+    Official HAT checkpoints are hosted on Google Drive/Baidu. For automation,
+    set HAT_MODEL_URL to a direct downloadable .pth URL.
+    """
+    dest = MODELS_DIR / "HAT_SRx2_ImageNet-pretrain.pth"
+    if dest.exists():
+        print("  ✓ HAT checkpoint already exists – skipping.")
+        return
+
+    url = os.environ.get("HAT_MODEL_URL", "").strip()
+    if not url:
+        print("\n⚠ HAT checkpoint URL not configured.")
+        print("  To auto-download, set HAT_MODEL_URL to a direct .pth URL, e.g.")
+        print("  export HAT_MODEL_URL='https://.../HAT_SRx2_ImageNet-pretrain.pth'")
+        print("  Then run: python download_models.py --hat")
+        print("  You can also manually place this file at:")
+        print(f"  {dest}")
+        print("  Official source folder:")
+        print("  https://drive.google.com/drive/folders/1HpmReFfoUqUbnAOQ7rvOeNU3uf_m69w0?usp=sharing")
+        return
+
+    print("\n⬇  Downloading HAT x2 checkpoint")
+    print(f"   Source  : {url}")
+    print(f"   Dest    : {dest}")
+    try:
+        urllib.request.urlretrieve(url, str(dest), reporthook=_progress)
+        print(f"\n  ✓ Saved → {dest}")
+    except Exception as exc:
+        print(f"\n  ✗ FAILED: {exc}")
+        if dest.exists():
+            dest.unlink()
+
 # ─── CLI ──────────────────────────────────────────────────────────────────────
 
 def main():
@@ -98,6 +137,8 @@ def main():
     parser.add_argument("--colorize",    action="store_true", help="Colorization DNN")
     parser.add_argument("--gfpgan",      action="store_true", help="GFPGAN restoration")
     parser.add_argument("--realesrgan",  action="store_true", help="Real-ESRGAN x2 + x4")
+    parser.add_argument("--swinir",      action="store_true", help="SwinIR x2 checkpoint")
+    parser.add_argument("--hat",         action="store_true", help="HAT x2 checkpoint (uses HAT_MODEL_URL)")
     parser.add_argument("--codeformer",  action="store_true", help="CodeFormer enhancement")
     args = parser.parse_args()
 
@@ -121,6 +162,12 @@ def main():
     if args.all or args.realesrgan:
         download("realesrgan_x2")
         download("realesrgan_x4")
+
+    if args.all or args.swinir:
+        download("swinir_x2")
+
+    if args.all or args.hat:
+        download_hat_checkpoint()
 
     if args.all or args.codeformer:
         download("codeformer")

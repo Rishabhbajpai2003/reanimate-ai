@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback } from 'react'
+import { useRef, useState, useCallback, useEffect } from 'react'
 
 const STEP_META = {
   restore:   { icon: '🧹', label: 'Restoration' },
@@ -6,6 +6,23 @@ const STEP_META = {
   super_res: { icon: '🔭', label: 'Super Resolution' },
   enhance:   { icon: '✨', label: 'Face Enhancement' },
   animate:   { icon: '🎭', label: 'Animation' },
+}
+
+const SR_MODEL_LABEL = {
+  realesrgan: 'Real-ESRGAN',
+  swinir: 'SwinIR',
+  hat: 'HAT',
+}
+
+function getStepMeta(stepName) {
+  if (stepName.startsWith('super_res:')) {
+    const model = stepName.split(':')[1] || ''
+    return {
+      icon: '🔭',
+      label: `Super Resolution (${SR_MODEL_LABEL[model] || model})`,
+    }
+  }
+  return STEP_META[stepName] ?? { icon: '⚙️', label: stepName }
 }
 
 /* ── Compare Slider ─────────────────────────────────────────────────────────── */
@@ -57,7 +74,7 @@ function StepTimeline({ steps }) {
   return (
     <div className="steps-timeline" aria-label="Pipeline steps">
       {steps.map((s, i) => {
-        const meta = STEP_META[s.step] ?? { icon: '⚙️', label: s.step }
+        const meta = getStepMeta(s.step)
         const status = s.skipped ? 'skip' : s.error ? 'err' : 'ok'
         return (
           <div className="step-row" key={i} style={{ animationDelay: `${i * 60}ms` }}>
@@ -78,7 +95,7 @@ function StepTimeline({ steps }) {
 
 /* ── Intermediate Grid ───────────────────────────────────────────────────────── */
 function IntermediatesGrid({ intermediates }) {
-  const entries = Object.entries(intermediates).filter(([k]) => k !== 'animate')
+  const entries = Object.entries(intermediates).filter(([k]) => k !== 'animate' && !k.startsWith('super_res_'))
   if (!entries.length) return null
   return (
     <div className="intermediates-grid">
@@ -91,6 +108,41 @@ function IntermediatesGrid({ intermediates }) {
           </div>
         )
       })}
+    </div>
+  )
+}
+
+function SrComparisonGrid({ outputs, activeModel, onSelect }) {
+  const entries = Object.entries(outputs || {})
+  if (!entries.length) return null
+
+  return (
+    <div className="sr-comparison-section">
+      <div className="card-title" style={{ marginTop: '1.25rem' }}>
+        <span>🧪</span> Super-Resolution Model Comparison
+      </div>
+      <div className="sr-comparison-grid">
+        {entries.map(([model, meta]) => {
+          const isActive = activeModel === model
+          return (
+            <button
+              key={model}
+              type="button"
+              className={`sr-output-card ${isActive ? 'active' : ''}`}
+              onClick={() => onSelect(model)}
+            >
+              <img src={meta.url} alt={`${SR_MODEL_LABEL[model] || model} output`} loading="lazy" />
+              <div className="sr-output-meta">
+                <span>{SR_MODEL_LABEL[model] || model}</span>
+                <small>
+                  {meta.backend === 'native' ? 'native model' : 'fallback backend'}
+                  {typeof meta.latency_s === 'number' ? ` · ${meta.latency_s}s` : ''}
+                </small>
+              </div>
+            </button>
+          )
+        })}
+      </div>
     </div>
   )
 }
@@ -148,6 +200,20 @@ function AnimationViewer({ animationUrl }) {
 export default function ResultViewer({ result, originalSrc }) {
   const [showIntermediates, setShowIntermediates] = useState(false)
   const [compareMode, setCompareMode]             = useState(false)
+  const [selectedSrModel, setSelectedSrModel]     = useState(() => {
+    const models = Object.keys(result?.sr_compare_outputs || {})
+    if (models.includes('realesrgan')) return 'realesrgan'
+    return models[0] || null
+  })
+
+  useEffect(() => {
+    const models = Object.keys(result?.sr_compare_outputs || {})
+    if (!models.length) {
+      setSelectedSrModel(null)
+      return
+    }
+    setSelectedSrModel(models.includes('realesrgan') ? 'realesrgan' : models[0])
+  }, [result])
 
   if (!result) return null
 
@@ -155,6 +221,9 @@ export default function ResultViewer({ result, originalSrc }) {
     k => k !== 'animate'
   ).length > 0
   const hasAnimation = !!result.animation_url
+  const hasSrCompare = Object.keys(result.sr_compare_outputs ?? {}).length > 0
+  const activeSrUrl = selectedSrModel && result.sr_compare_outputs?.[selectedSrModel]?.url
+  const displayUrl = activeSrUrl || result.result_url
 
   return (
     <div className="card result-section" id="result-section">
@@ -194,17 +263,17 @@ export default function ResultViewer({ result, originalSrc }) {
       )}
 
       {compareMode && originalSrc ? (
-        <CompareSlider originalSrc={originalSrc} resultSrc={result.result_url} />
+        <CompareSlider originalSrc={originalSrc} resultSrc={displayUrl} />
       ) : (
         <div className="result-image-wrap">
-          <img src={result.result_url} alt="Restored portrait" id="result-img" />
+          <img src={displayUrl} alt="Restored portrait" id="result-img" />
           <div className="result-glow" aria-hidden="true" />
         </div>
       )}
 
       {/* Download enhanced image */}
       <a
-        href={result.result_url}
+        href={displayUrl}
         download="reanimateai_result.png"
         className="btn-download"
         id="btn-download"
@@ -216,6 +285,14 @@ export default function ResultViewer({ result, originalSrc }) {
       {/* ── Animation GIF / Video ──────────────────────────────────────────── */}
       {hasAnimation && (
         <AnimationViewer animationUrl={result.animation_url} />
+      )}
+
+      {hasSrCompare && (
+        <SrComparisonGrid
+          outputs={result.sr_compare_outputs}
+          activeModel={selectedSrModel}
+          onSelect={setSelectedSrModel}
+        />
       )}
 
       {/* Steps */}
