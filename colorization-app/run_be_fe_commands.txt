@@ -1,58 +1,125 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Run this whole file from the project root:
-# /Users/yashkumarsaini/IIITD/CV/Project/cv project/reanimateai
-
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BACKEND_DIR="$ROOT_DIR/backend"
 FRONTEND_DIR="$ROOT_DIR/frontend"
+
 BACKEND_PORT=5000
 FRONTEND_PORT=3000
 
 echo "==> Project root: $ROOT_DIR"
 
-echo "==> Killing any process on ports $BACKEND_PORT and $FRONTEND_PORT (if running)..."
+# =========================
+# Kill ports safely
+# =========================
+echo "==> Cleaning ports..."
 lsof -ti tcp:$BACKEND_PORT | xargs kill -9 2>/dev/null || true
 lsof -ti tcp:$FRONTEND_PORT | xargs kill -9 2>/dev/null || true
 
-echo "==> Backend setup (Python 3.11 venv + deps)"
+# =========================
+# Backend setup
+# =========================
+echo "==> Backend setup"
 cd "$BACKEND_DIR"
 
 if ! command -v python3.11 >/dev/null 2>&1; then
-  echo "ERROR: python3.11 not found. Install Python 3.11 first."
+  echo "❌ ERROR: python3.11 not found"
   exit 1
 fi
 
 if [ ! -d ".venv" ]; then
+  echo "==> Creating virtual environment"
   python3.11 -m venv .venv
 fi
 
+echo "==> Installing Python dependencies"
 .venv/bin/python -m pip install --upgrade pip
 .venv/bin/pip install -r ../requirements.txt
 
-echo "==> Ensuring colorization models are available"
+# =========================
+# Models setup (STRICT)
+# =========================
+echo "==> Setting up models..."
+
+mkdir -p models/{colorize,gfpgan,realesrgan,codeformer}
+
+# Colorization
+echo "→ Colorization"
 .venv/bin/python download_models.py --colorize
 
-echo "==> Frontend setup (npm deps)"
+# GFPGAN
+echo "→ GFPGAN"
+if [ ! -f models/gfpgan/GFPGANv1.4.pth ]; then
+  curl -L -o models/gfpgan/GFPGANv1.4.pth \
+  https://github.com/TencentARC/GFPGAN/releases/download/v1.4/GFPGANv1.4.pth
+fi
+
+# RealESRGAN
+echo "→ RealESRGAN"
+if [ ! -f models/realesrgan/RealESRGAN_x4plus.pth ]; then
+  curl -L -o models/realesrgan/RealESRGAN_x4plus.pth \
+  https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth
+fi
+
+# CodeFormer
+echo "→ CodeFormer"
+if [ ! -f models/codeformer/codeformer.pth ]; then
+  curl -L -o models/codeformer/codeformer.pth \
+  https://github.com/sczhou/CodeFormer/releases/download/v0.1.0/codeformer.pth
+fi
+
+# =========================
+# Install CodeFormer repo
+# =========================
+cd "$ROOT_DIR"
+
+if [ ! -d "CodeFormer" ]; then
+  echo "==> Cloning CodeFormer"
+  git clone https://github.com/sczhou/CodeFormer.git
+fi
+
+echo "==> Installing CodeFormer deps"
+cd CodeFormer
+"$BACKEND_DIR/.venv/bin/pip" install -r requirements.txt || true
+
+# =========================
+# Frontend setup
+# =========================
+echo "==> Frontend setup"
 cd "$FRONTEND_DIR"
 npm install
 
-echo "==> Starting backend on http://localhost:$BACKEND_PORT"
+# =========================
+# Environment safety
+# =========================
+export HF_HUB_OFFLINE=1
+export TORCH_HOME="$BACKEND_DIR/models"
+
+# =========================
+# Run services
+# =========================
+echo "==> Starting backend"
 cd "$BACKEND_DIR"
 nohup .venv/bin/python app.py > "$ROOT_DIR/backend.log" 2>&1 &
 
-echo "==> Starting frontend on http://localhost:$FRONTEND_PORT"
+echo "==> Starting frontend"
 cd "$FRONTEND_DIR"
 nohup npm run dev -- --host 0.0.0.0 --port $FRONTEND_PORT > "$ROOT_DIR/frontend.log" 2>&1 &
 
-sleep 3
+sleep 5
 
-echo "==> Health check backend"
-curl -s "http://localhost:$BACKEND_PORT/api/health" || true
-echo
+# =========================
+# Health check
+# =========================
+echo "==> Checking backend health"
+if curl -s "http://localhost:$BACKEND_PORT/api/health" >/dev/null; then
+  echo "✅ Backend is healthy"
+else
+  echo "⚠️ Backend did not respond (check logs)"
+fi
 
-echo "==> Done."
+echo "==> DONE"
 echo "Frontend: http://localhost:$FRONTEND_PORT"
 echo "Backend : http://localhost:$BACKEND_PORT"
-echo "Logs    : $ROOT_DIR/backend.log and $ROOT_DIR/frontend.log"
+echo "Logs    : backend.log | frontend.log"

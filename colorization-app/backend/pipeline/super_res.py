@@ -31,8 +31,15 @@ class SuperResModule:
             model_path = (
                 Path(__file__).parent.parent
                 / "models"
+                / "realesrgan"
                 / f"RealESRGAN_x{SCALE}plus.pth"
             )
+            if not model_path.exists():
+                model_path = (
+                    Path(__file__).parent.parent
+                    / "models"
+                    / f"RealESRGAN_x{SCALE}plus.pth"
+                )
             if not model_path.exists():
                 logger.info("Real-ESRGAN model not found – using OpenCV fallback")
                 return

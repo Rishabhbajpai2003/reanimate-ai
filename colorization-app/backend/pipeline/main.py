@@ -7,6 +7,14 @@ import logging
 from pathlib import Path
 from typing import Any, Optional, Dict
 
+import torch
+_original_load = torch.load
+def _safe_load(*args, **kwargs):
+    if 'weights_only' not in kwargs:
+        kwargs['weights_only'] = False
+    return _original_load(*args, **kwargs)
+torch.load = _safe_load
+
 from .restore   import RestoreModule
 from .super_res import SuperResModule
 from .colorize  import ColorizeModule

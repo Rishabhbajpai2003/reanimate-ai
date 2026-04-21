@@ -13,7 +13,9 @@ from pathlib import Path
 logger = logging.getLogger("pipeline.enhance")
 
 MODELS_DIR  = Path(__file__).parent.parent / "models"
-CF_WEIGHTS  = MODELS_DIR / "codeformer.pth"
+CF_WEIGHTS  = MODELS_DIR / "codeformer" / "codeformer.pth"
+if not CF_WEIGHTS.exists():
+    CF_WEIGHTS = MODELS_DIR / "codeformer.pth"
 
 
 class EnhanceModule:
