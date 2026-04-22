@@ -8,7 +8,7 @@ const api = axios.create({
 /**
  * Upload an image and run the pipeline.
  * @param {File}    imageFile
- * @param {Object}  options   - { restore, super_res, colorize, enhance, animate }
+ * @param {Object}  options   - { restore, super_res, colorize, enhance, animate, sr_compare, sr_models }
  * @param {File}    [audioFile] - optional audio for animation
  * @param {Function} [onProgress] - Axios upload progress callback
  */
@@ -16,7 +16,13 @@ export async function processImage(imageFile, options, audioFile = null, onProgr
   const form = new FormData()
   form.append('image', imageFile)
 
-  Object.entries(options).forEach(([k, v]) => form.append(k, v ? 'true' : 'false'))
+  const {
+    sr_models = ['realesrgan'],
+    ...boolOptions
+  } = options
+
+  Object.entries(boolOptions).forEach(([k, v]) => form.append(k, v ? 'true' : 'false'))
+  form.append('sr_models', JSON.stringify(sr_models))
 
   if (audioFile) form.append('audio', audioFile)
 

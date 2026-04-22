@@ -11,11 +11,11 @@ face enhancement, and optional talking-head animation in one production-ready we
 |---|---|---|
 | Restoration | GFPGAN v1.4 | OpenCV NLM denoising |
 | Colorization | Zhang et al. (OpenCV DNN) | Vibrance boost |
-| Super Resolution | Real-ESRGAN ×2 | Lanczos4 + unsharp mask |
+| Super Resolution | Real-ESRGAN / SwinIR / HAT | OpenCV profile fallback |
 | Face Enhancement | CodeFormer | CLAHE + bilateral filter |
 | Animation | SadTalker | FFmpeg static loop |
 
-Every module gracefully degrades to a CPU-friendly fallback if the heavy model is not installed.
+Every module gracefully degrades to a CPU-friendly fallback if checkpoints are missing.
 
 ---
 
@@ -109,6 +109,8 @@ python download_models.py --all
 python download_models.py --colorize      # Zhang et al. colorization DNN
 python download_models.py --gfpgan        # GFPGAN v1.4 restoration
 python download_models.py --realesrgan    # Real-ESRGAN x2 + x4
+python download_models.py --swinir        # SwinIR x2 checkpoint
+python download_models.py --hat           # HAT x2 checkpoint (uses HAT_MODEL_URL)
 python download_models.py --codeformer    # CodeFormer face enhancement
 ```
 
@@ -122,7 +124,20 @@ Models are saved in `backend/models/`:
 | `GFPGANv1.4.pth` | ~332 MB | Restoration |
 | `RealESRGAN_x2plus.pth` | ~67 MB | Super Resolution ×2 |
 | `RealESRGAN_x4plus.pth` | ~67 MB | Super Resolution ×4 |
+| `001_classicalSR_DF2K_s64w8_SwinIR-M_x2.pth` | ~45 MB | SwinIR ×2 |
+| `HAT_SRx2_ImageNet-pretrain.pth` | ~100+ MB | HAT ×2 |
 | `codeformer.pth` | ~375 MB | Face Enhancement |
+
+### HAT checkpoint note
+
+Official HAT weights are hosted on Google Drive/Baidu. To automate download:
+
+```bash
+export HAT_MODEL_URL="https://<direct-url>/HAT_SRx2_ImageNet-pretrain.pth"
+python download_models.py --hat
+```
+
+Or place the checkpoint manually at `backend/models/HAT_SRx2_ImageNet-pretrain.pth`.
 
 ### SadTalker (Animation)
 
@@ -217,6 +232,8 @@ Upload an image and run the pipeline.
 | `super_res` | bool | true | Enable super resolution |
 | `enhance` | bool | true | Enable face enhancement |
 | `animate` | bool | false | Enable animation |
+| `sr_compare` | bool | false | Run SR ablation for selected SR models |
+| `sr_models` | JSON array | `['realesrgan']` | Any of `realesrgan`, `swinir`, `hat` |
 | `audio` | File | — | Audio file for animation |
 
 **Response:**

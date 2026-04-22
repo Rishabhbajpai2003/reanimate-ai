@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Run this file from anywhere; paths are resolved relative to this script.
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BACKEND_DIR="$ROOT_DIR/backend"
 FRONTEND_DIR="$ROOT_DIR/frontend"
@@ -19,44 +20,58 @@ lsof -ti tcp:$BACKEND_PORT | xargs kill -9 2>/dev/null || true
 lsof -ti tcp:$FRONTEND_PORT | xargs kill -9 2>/dev/null || true
 pgrep -f "python app.py" | xargs kill -9 2>/dev/null || true
 
-# =========================
-# Backend setup
-# =========================
-echo "==> Backend setup"
+echo "==> Backend setup (auto-detect Python environment + deps)"
 cd "$BACKEND_DIR"
 
-if ! command -v python3.11 >/dev/null 2>&1; then
-  echo "❌ ERROR: python3.11 not found"
-  exit 1
-fi
+PY_RUN=()
 
-if [ ! -d ".venv" ]; then
-    echo "==> Creating backend virtual environment"
-    python3.11 -m venv .venv
-fi
+# 1) Prefer project-local venv if it already exists.
+if [ -x ".venv/bin/python" ]; then
+  PY_RUN=("$BACKEND_DIR/.venv/bin/python")
+  echo "==> Using existing backend venv: $BACKEND_DIR/.venv"
 
-# =========================
-# Install backend deps (ONCE)
-# =========================
-if [ ! -f ".venv/.installed" ]; then
-  echo "==> Installing backend dependencies..."
+# 2) Otherwise, use currently active Conda/Mamba env if present.
+elif [ -n "${CONDA_PREFIX:-}" ] && command -v python >/dev/null 2>&1; then
+  PY_RUN=(python)
+  echo "==> Using active Conda/Mamba environment: ${CONDA_DEFAULT_ENV:-$CONDA_PREFIX}"
 
-  .venv/bin/pip install --upgrade pip
-  .venv/bin/pip install wheel packaging
-  .venv/bin/pip install git+https://github.com/XPixelGroup/BasicSR.git@master
-  .venv/bin/pip install -r "$ROOT_DIR/requirements.txt"
-
-  touch .venv/.installed
+# 3) Otherwise create a local .venv using python3.11, falling back to python3.
 else
-  echo "✓ Backend dependencies already installed"
+  if command -v python3.11 >/dev/null 2>&1; then
+    BASE_PY=python3.11
+  elif command -v python3 >/dev/null 2>&1; then
+    BASE_PY=python3
+  else
+    echo "ERROR: No suitable Python found (need python3.11 or python3)."
+    echo "Tip: activate your Conda/Mamba env first, or install Python 3."
+    exit 1
+  fi
+
+  echo "==> Creating backend venv at $BACKEND_DIR/.venv using $BASE_PY"
+  "$BASE_PY" -m venv .venv
+  PY_RUN=("$BACKEND_DIR/.venv/bin/python")
 fi
+
+echo "==> Installing backend deps (once)"
+if [[ "${PY_RUN[0]}" == *"/.venv/"* ]] && [ -f ".venv/.installed" ]; then
+  echo "✓ Backend dependencies already installed (.venv)"
+else
+  "${PY_RUN[@]}" -m pip install --upgrade pip
+  "${PY_RUN[@]}" -m pip install -r ../requirements.txt
+  if [[ "${PY_RUN[0]}" == *"/.venv/"* ]]; then
+    touch .venv/.installed
+  fi
+fi
+
+echo "==> Ensuring colorization models are available"
+"${PY_RUN[@]}" download_models.py --colorize
 
 # =========================
 # Models setup (NO RE-DOWNLOAD)
 # =========================
 echo "==> Setting up models..."
 if [ ! -d "$BACKEND_DIR/models/BFM" ]; then
-  .venv/bin/python download_models.py --all
+  "${PY_RUN[@]}" download_models.py --all
 else
   echo "✓ Models already exist — skipping download"
 fi
@@ -147,9 +162,8 @@ export PYTHONPATH="$BACKEND_DIR"
 # =========================
 echo "==> Starting backend"
 cd "$BACKEND_DIR"
-
 cat /dev/null > "$ROOT_DIR/backend.log"
-nohup .venv/bin/python app.py >> "$ROOT_DIR/backend.log" 2>&1 &
+nohup "${PY_RUN[@]}" app.py >> "$ROOT_DIR/backend.log" 2>&1 &
 
 # =========================
 # Run frontend

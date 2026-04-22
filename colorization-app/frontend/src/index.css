@@ -335,6 +335,64 @@ body {
   color: var(--clr-text-muted);
 }
 
+.sr-controls {
+  margin-top: 1rem;
+  border-top: 1px solid var(--clr-border);
+  padding-top: 1rem;
+}
+.sr-headline {
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--clr-text-dim);
+  margin-bottom: 0.6rem;
+}
+.sr-compare-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.85rem 1rem;
+  border-radius: var(--radius-sm);
+  background: var(--clr-surface-2);
+  border: 1px solid var(--clr-border);
+  cursor: pointer;
+}
+.sr-model-grid {
+  margin-top: 0.75rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 0.6rem;
+}
+.sr-model-chip {
+  border: 1px solid var(--clr-border);
+  background: var(--clr-surface-2);
+  border-radius: var(--radius-sm);
+  color: var(--clr-text-dim);
+  padding: 0.65rem 0.8rem;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+.sr-model-chip span {
+  color: var(--clr-text);
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+.sr-model-chip small {
+  color: var(--clr-text-muted);
+  font-size: 0.7rem;
+}
+.sr-model-chip.selected {
+  border-color: rgba(79, 140, 247, 0.45);
+  background: rgba(79, 140, 247, 0.08);
+}
+.sr-model-chip:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 /* ── Toggle Switch ── */
 .toggle-switch {
   width: 38px;
@@ -576,6 +634,46 @@ body {
   color: var(--clr-text-muted);
   font-weight: 500;
   text-transform: capitalize;
+}
+
+.sr-comparison-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.8rem;
+}
+.sr-output-card {
+  border: 1px solid var(--clr-border);
+  background: var(--clr-surface-2);
+  border-radius: var(--radius-sm);
+  padding: 0;
+  overflow: hidden;
+  cursor: pointer;
+  text-align: left;
+}
+.sr-output-card.active {
+  border-color: rgba(79, 140, 247, 0.6);
+  box-shadow: 0 0 0 1px rgba(79, 140, 247, 0.35);
+}
+.sr-output-card img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  display: block;
+}
+.sr-output-meta {
+  padding: 0.55rem 0.65rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.sr-output-meta span {
+  color: var(--clr-text);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+.sr-output-meta small {
+  color: var(--clr-text-muted);
+  font-size: 0.7rem;
 }
 
 /* ─── Toast ─────────────────────────────────────────────────────────────── */
