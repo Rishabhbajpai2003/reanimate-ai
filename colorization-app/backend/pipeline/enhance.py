@@ -13,7 +13,9 @@ from pathlib import Path
 logger = logging.getLogger("pipeline.enhance")
 
 MODELS_DIR  = Path(__file__).parent.parent / "models"
-CF_WEIGHTS  = MODELS_DIR / "codeformer.pth"
+CF_WEIGHTS  = MODELS_DIR / "codeformer" / "codeformer.pth"
+if not CF_WEIGHTS.exists():
+    CF_WEIGHTS = MODELS_DIR / "codeformer.pth"
 
 
 class EnhanceModule:
@@ -28,7 +30,6 @@ class EnhanceModule:
             return
         try:
             import torch
-            from basicsr.utils.download_util import load_file_from_url  # noqa
             # CodeFormer net
             from basicsr.archs.codeformer_arch import CodeFormer
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -45,8 +46,8 @@ class EnhanceModule:
             self._cf     = net
             self._device = device
             logger.info("CodeFormer loaded on %s ✓", device)
-        except ImportError:
-            logger.info("codeformer/basicsr not installed – using OpenCV fallback")
+        except ImportError as err:
+            logger.info("codeformer/basicsr not installed or import error: %s – using OpenCV fallback", err)
         except Exception as exc:
             logger.warning("CodeFormer load error: %s", exc)
 

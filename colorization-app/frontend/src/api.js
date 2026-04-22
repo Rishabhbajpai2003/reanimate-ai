@@ -2,7 +2,7 @@ import axios from 'axios'
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || '',
-  timeout: 180_000, // 3 minutes for heavy models
+  timeout: 600_000, // 10 minutes for heavy models (e.g. SadTalker on M2)
 })
 
 /**

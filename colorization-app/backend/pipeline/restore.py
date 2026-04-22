@@ -22,7 +22,9 @@ class RestoreModule:
     def _try_load_gfpgan(self):
         try:
             from gfpgan import GFPGANer
-            model_path = Path(__file__).parent.parent / "models" / "GFPGANv1.4.pth"
+            model_path = Path(__file__).parent.parent / "models" / "gfpgan" / "GFPGANv1.4.pth"
+            if not model_path.exists():
+                model_path = Path(__file__).parent.parent / "models" / "GFPGANv1.4.pth"
             if model_path.exists():
                 self._gfpgan = GFPGANer(
                     model_path=str(model_path),
@@ -34,10 +36,10 @@ class RestoreModule:
                 logger.info("GFPGAN loaded ✓")
             else:
                 logger.info("GFPGAN model not found – using OpenCV fallback")
-        except ImportError:
-            logger.info("gfpgan package not installed – using OpenCV fallback")
+        except ImportError as err:
+            logger.info("realesrgan/basicsr not installed or import error: %s – using OpenCV fallback", err)
         except Exception as exc:
-            logger.warning("GFPGAN load error: %s", exc)
+            logger.warning("Real-ESRGAN load error: %s", exc)
 
     # ── Public API ────────────────────────────────────────────────────────────
     def process(self, input_path: str, output_path: str) -> str:
@@ -60,13 +62,17 @@ class RestoreModule:
     # ── GFPGAN path ───────────────────────────────────────────────────────────
     def _run_gfpgan(self, img: np.ndarray, input_path: str) -> np.ndarray:
         try:
-            _, _, restored_faces = self._gfpgan.enhance(
+            logger.info("Starting GFPGAN inference...")
+            cropped_faces, restored_faces, restored_img = self._gfpgan.enhance(
                 img,
                 has_aligned=False,
                 only_center_face=False,
                 paste_back=True,
             )
-            return restored_faces[0] if restored_faces else img
+            logger.info("GFPGAN inference complete. Faces detected: %d", len(cropped_faces) if cropped_faces else 0)
+            if restored_img is not None:
+                return restored_img
+            return img
         except Exception as exc:
             logger.warning("GFPGAN inference error (%s) – falling back to OpenCV", exc)
             return self._run_opencv(img)

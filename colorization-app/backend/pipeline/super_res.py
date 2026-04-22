@@ -31,8 +31,15 @@ class SuperResModule:
             model_path = (
                 Path(__file__).parent.parent
                 / "models"
+                / "realesrgan"
                 / f"RealESRGAN_x{SCALE}plus.pth"
             )
+            if not model_path.exists():
+                model_path = (
+                    Path(__file__).parent.parent
+                    / "models"
+                    / f"RealESRGAN_x{SCALE}plus.pth"
+                )
             if not model_path.exists():
                 logger.info("Real-ESRGAN model not found – using OpenCV fallback")
                 return
@@ -57,8 +64,8 @@ class SuperResModule:
                 device=device,
             )
             logger.info("Real-ESRGAN x%d loaded on %s ✓", SCALE, device)
-        except ImportError:
-            logger.info("realesrgan/basicsr not installed – using OpenCV fallback")
+        except ImportError as err:
+            logger.info("realesrgan/basicsr not installed or import error: %s – using OpenCV fallback", err)
         except Exception as exc:
             logger.warning("Real-ESRGAN load error: %s", exc)
 
