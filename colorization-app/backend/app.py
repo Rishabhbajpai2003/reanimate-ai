@@ -194,6 +194,9 @@ def server_error(exc):
 # ─── Entry Point ──────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    debug = os.environ.get("FLASK_ENV", "development") == "development"
+
+    # 🔥 FORCE production mode (no reload, no double imports)
+    debug = False
+
     logger.info("Starting ReAnimateAI on port %d (debug=%s)", port, debug)
     app.run(host="0.0.0.0", port=port, debug=debug)

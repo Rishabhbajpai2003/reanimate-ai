@@ -8,14 +8,19 @@ from typing import Optional, List, Tuple
 import cv2
 import numpy as np
 import mediapipe as mp
+import traceback
+import os
+
+SADTALKER_DIR = Path(__file__).parent.parent.parent / "SadTalker"
+SADTALKER_PYTHON = SADTALKER_DIR / "sadtalker_env" / "bin" / "python"
 
 logger = logging.getLogger("pipeline.animate")
 
 SADTALKER_DIR = Path(__file__).parent.parent.parent / "SadTalker"
 MODEL_PATH = Path(__file__).parent.parent / "models" / "face_landmarker.task"
 
-FPS = 20
-DURATION_SEC = 4.0
+FPS = 10
+DURATION_SEC = 2.0
 TOTAL_FRAMES = int(FPS * DURATION_SEC)
 
 
@@ -227,50 +232,120 @@ class AnimateModule:
         except Exception as exc:
             logger.error("Static blink GIF generation failed", exc_info=True)
             raise
+    # SADTALKER_DIR = Path(__file__).parent.parent.parent / "SadTalker"
+    # SADTALKER_PYTHON = SADTALKER_DIR / "sadtalker_env" / "bin" / "python"
+    print("Python path:", SADTALKER_PYTHON)
+    print("Exists:", SADTALKER_PYTHON.exists())
+    print("\n🚀 Running SadTalker...")
+    print("Python path:", SADTALKER_PYTHON)
+    print("Exists:", SADTALKER_PYTHON.exists())
 
-    # ─────────────────────────────────────────────
+    
+
+
     def _run_sadtalker(self, img_path, output_path, audio_path):
         try:
-            # Use a default audio file if none provided to trigger AI animation
+            # fallback audio if none
             if not audio_path:
-                audio_path = str(SADTALKER_DIR / "examples" / "driven_audio" / "imagine.wav")
-                if not Path(audio_path).exists():
-                    logger.warning("Default audio not found, falling back to static blink")
-                    return self._generate_static_blink_gif(img_path, output_path)
+                audio_path = str(SADTALKER_DIR / "examples" / "driven_audio" / "yash.wav")
 
-            result_dir = str(Path(output_path).parent / "tmp")
-            
-            # Use absolute paths because we change CWD
-            abs_img = str(Path(img_path).absolute())
-            abs_audio = str(Path(audio_path).absolute())
-            abs_result = str(Path(result_dir).absolute())
+            result_dir = Path(output_path).parent / "tmp"
+            result_dir.mkdir(parents=True, exist_ok=True)
 
             cmd = [
-                str(Path(__file__).parent.parent / ".venv" / "bin" / "python"),
+                str(SADTALKER_PYTHON),
                 "inference.py",
-                "--driven_audio", abs_audio,
-                "--source_image", abs_img,
-                "--result_dir", abs_result,
-                "--preprocess", "full",
-                "--enhancer", "gfpgan",
-                "--background_enhancer", "realesrgan", # Better background
-                "--expression_scale", "1.1",           # More natural expression
-            ]
-            # Note: Removed --still to allow natural head/neck motion
-            logger.info("Running SadTalker (Best Practices) in %s: %s", SADTALKER_DIR, " ".join(cmd))
-            subprocess.run(cmd, check=True, cwd=str(SADTALKER_DIR))
+                "--driven_audio", str(Path(audio_path).absolute()),
+                "--source_image", str(Path(img_path).absolute()),
+                "--result_dir", str(result_dir.absolute()),
 
-            mp4_files = list(Path(result_dir).rglob("*.mp4"))
+                # 🔥 FAST SETTINGS
+                "--preprocess", "crop",          # already good
+                "--still",                       # minimal head motion
+                "--size", "256",                 # ⬅️ BIGGEST SPEED BOOST
+                "--expression_scale", "0.6",     # less computation
+                "--enhancer", "none",            # disable GFPGAN (very important)
+            ]
+
+            # 🔥 isolate environment
+            env = os.environ.copy()
+            env["PYTHONPATH"] = str(SADTALKER_DIR)
+            env.pop("PYTHONHOME", None)
+
+            print("🚀 Running SadTalker in isolated env...")
+            subprocess.run(
+                cmd,
+                check=True,
+                cwd=str(SADTALKER_DIR),
+                env=env
+            )
+
+            # find output
+            mp4_files = list(result_dir.rglob("*.mp4"))
             if mp4_files:
-                # Ensure output_path has .mp4 extension for clarity if it's a video
                 final_output = str(Path(output_path).with_suffix(".mp4"))
                 shutil.move(str(mp4_files[0]), final_output)
-                logger.info("SadTalker SUCCESS: Result saved to %s", final_output)
                 return final_output
-            
-            logger.warning("SadTalker finished but no MP4 was found in %s – falling back to static blink", result_dir)
-            return self._generate_static_blink_gif(img_path, output_path)
 
-        except Exception as exc:
-            logger.error("SadTalker CRASHED: %s", exc, exc_info=True)
+            raise RuntimeError("SadTalker did not generate output")
+
+        except Exception as e:
+            print("\n❌ SadTalker failed → fallback")
+            traceback.print_exc()
+            print("Error message:", e)
             return self._generate_static_blink_gif(img_path, output_path)
+            
+    # ─────────────────────────────────────────────
+    # def _run_sadtalker(self, img_path, output_path, audio_path):
+    #     try:
+    #         # Use a default audio file if none provided to trigger AI animation
+    #         if not audio_path:
+    #             audio_path = str(SADTALKER_DIR / "examples" / "driven_audio" / "imagine.wav")
+    #             if not Path(audio_path).exists():
+    #                 logger.warning("Default audio not found, falling back to static blink")
+    #                 return self._generate_static_blink_gif(img_path, output_path)
+
+    #         result_dir = str(Path(output_path).parent / "tmp")
+            
+    #         # Use absolute paths because we change CWD
+    #         abs_img = str(Path(img_path).absolute())
+    #         abs_audio = str(Path(audio_path).absolute())
+    #         abs_result = str(Path(result_dir).absolute())
+
+    #         cmd = [
+    #             str(Path(__file__).parent.parent / ".venv" / "bin" / "python"),
+    #             "inference.py",
+    #             "--driven_audio", abs_audio,
+    #             "--source_image", abs_img,
+    #             "--result_dir", abs_result,
+    #             "--preprocess", "full",
+    #             "--enhancer", "gfpgan",
+    #             "--background_enhancer", "realesrgan", # Better background
+    #             "--expression_scale", "1.1",           # More natural expression
+    #         ]
+    #         # Note: Removed --still to allow natural head/neck motion
+    #         logger.info("Running SadTalker (Best Practices) in %s: %s", SADTALKER_DIR, " ".join(cmd))
+    #         subprocess.run(cmd, check=True, cwd=str(SADTALKER_DIR))
+
+    #         mp4_files = list(Path(result_dir).rglob("*.mp4"))
+    #         if mp4_files:
+    #             # Ensure output_path has .mp4 extension for clarity if it's a video
+    #             final_output = str(Path(output_path).with_suffix(".mp4"))
+    #             shutil.move(str(mp4_files[0]), final_output)
+    #             logger.info("SadTalker SUCCESS: Result saved to %s", final_output)
+                
+    #             # Cleanup temp alignment frames to save space
+    #             try:
+    #                 shutil.rmtree(result_dir)
+    #                 logger.info("Temporary frames cleaned up.")
+    #             except Exception:
+    #                 pass
+
+    #             return final_output
+            
+    #         logger.warning("SadTalker finished but no MP4 was found in %s – falling back to static blink", result_dir)
+    #         return self._generate_static_blink_gif(img_path, output_path)
+
+    #     except Exception as exc:
+    #         logger.error("SadTalker CRASHED: %s", exc, exc_info=True)
+    #         return self._generate_static_blink_gif(img_path, output_path)

@@ -18,15 +18,16 @@ MODELS_DIR.mkdir(exist_ok=True)
 
 # ─── Model Registry ───────────────────────────────────────────────────────────
 MODELS = {
+    # Central models directory
     "colorize_proto": {
         "url":  "https://github.com/richzhang/colorization/raw/caffe/colorization/models/colorization_deploy_v2.prototxt",
         "dest": MODELS_DIR / "colorization_deploy_v2.prototxt",
-        "desc": "Colorization prototxt (Zhang et al.)",
+        "desc": "Colorization prototxt",
     },
     "colorize_model": {
         "url":  "https://github.com/spmallick/learnopencv/releases/download/Colorization/colorization_release_v2.caffemodel",
         "dest": MODELS_DIR / "colorization_release_v2.caffemodel",
-        "desc": "Colorization caffemodel (Zhang et al.)",
+        "desc": "Colorization model",
     },
     "colorize_pts": {
         "url":  "https://github.com/richzhang/colorization/raw/caffe/colorization/resources/pts_in_hull.npy",
@@ -36,68 +37,68 @@ MODELS = {
     "gfpgan": {
         "url":  "https://github.com/TencentARC/GFPGAN/releases/download/v1.3.4/GFPGANv1.4.pth",
         "dest": MODELS_DIR / "GFPGANv1.4.pth",
-        "desc": "GFPGAN v1.4 restoration model",
+        "desc": "GFPGAN v1.4",
     },
     "realesrgan_x2": {
         "url":  "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.1/RealESRGAN_x2plus.pth",
         "dest": MODELS_DIR / "RealESRGAN_x2plus.pth",
-        "desc": "Real-ESRGAN x2 super resolution",
+        "desc": "Real-ESRGAN x2",
     },
     "realesrgan_x4": {
         "url":  "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth",
         "dest": MODELS_DIR / "RealESRGAN_x4plus.pth",
-        "desc": "Real-ESRGAN x4 super resolution",
+        "desc": "Real-ESRGAN x4",
     },
     "codeformer": {
         "url":  "https://github.com/sczhou/CodeFormer/releases/download/v0.1.0/codeformer.pth",
         "dest": MODELS_DIR / "codeformer.pth",
-        "desc": "CodeFormer face enhancement",
+        "desc": "CodeFormer",
     },
     "face_landmarker": {
         "url":  "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task",
         "dest": MODELS_DIR / "face_landmarker.task",
-        "desc": "MediaPipe Face Landmarker (v2)",
+        "desc": "Face Landmarker",
     },
-    # SadTalker models
+    # SadTalker models (stored centrally)
     "sadtalker_256": {
         "url":  "https://github.com/OpenTalker/SadTalker/releases/download/v0.0.2-rc/SadTalker_V0.0.2_256.safetensors",
-        "dest": Path(__file__).parent.parent / "SadTalker" / "checkpoints" / "SadTalker_V0.0.2_256.safetensors",
-        "desc": "SadTalker 256 model",
+        "dest": MODELS_DIR / "SadTalker_V0.0.2_256.safetensors",
+        "desc": "SadTalker 256",
     },
     "sadtalker_512": {
         "url":  "https://github.com/OpenTalker/SadTalker/releases/download/v0.0.2-rc/SadTalker_V0.0.2_512.safetensors",
-        "dest": Path(__file__).parent.parent / "SadTalker" / "checkpoints" / "SadTalker_V0.0.2_512.safetensors",
-        "desc": "SadTalker 512 model",
+        "dest": MODELS_DIR / "SadTalker_V0.0.2_512.safetensors",
+        "desc": "SadTalker 512",
     },
     "sadtalker_mapping_109": {
         "url":  "https://github.com/OpenTalker/SadTalker/releases/download/v0.0.2-rc/mapping_00109-model.pth.tar",
-        "dest": Path(__file__).parent.parent / "SadTalker" / "checkpoints" / "mapping_00109-model.pth.tar",
+        "dest": MODELS_DIR / "mapping_00109-model.pth.tar",
         "desc": "SadTalker mapping 109",
     },
     "sadtalker_mapping_229": {
         "url":  "https://github.com/OpenTalker/SadTalker/releases/download/v0.0.2-rc/mapping_00229-model.pth.tar",
-        "dest": Path(__file__).parent.parent / "SadTalker" / "checkpoints" / "mapping_00229-model.pth.tar",
+        "dest": MODELS_DIR / "mapping_00229-model.pth.tar",
         "desc": "SadTalker mapping 229",
     },
     "sadtalker_alignment": {
         "url":  "https://github.com/xinntao/facexlib/releases/download/v0.1.0/alignment_WFLW_4HG.pth",
-        "dest": Path(__file__).parent.parent / "SadTalker" / "gfpgan" / "weights" / "alignment_WFLW_4HG.pth",
-        "desc": "SadTalker face alignment",
+        "dest": MODELS_DIR / "alignment_WFLW_4HG.pth",
+        "desc": "Face alignment",
     },
     "sadtalker_detection": {
         "url":  "https://github.com/xinntao/facexlib/releases/download/v0.1.0/detection_Resnet50_Final.pth",
-        "dest": Path(__file__).parent.parent / "SadTalker" / "gfpgan" / "weights" / "detection_Resnet50_Final.pth",
-        "desc": "SadTalker face detection",
+        "dest": MODELS_DIR / "detection_Resnet50_Final.pth",
+        "desc": "Face detection",
     },
     "sadtalker_parsing": {
         "url":  "https://github.com/xinntao/facexlib/releases/download/v0.2.2/parsing_parsenet.pth",
-        "dest": Path(__file__).parent.parent / "SadTalker" / "gfpgan" / "weights" / "parsing_parsenet.pth",
-        "desc": "SadTalker face parsing",
+        "dest": MODELS_DIR / "parsing_parsenet.pth",
+        "desc": "Face parsing",
     },
     "sadtalker_bfm": {
         "url":  "https://github.com/Winfredy/SadTalker/releases/download/v0.0.2/BFM_Fitting.zip",
-        "dest": Path(__file__).parent.parent / "SadTalker" / "checkpoints" / "BFM_Fitting.zip",
-        "desc": "SadTalker BFM fitting models",
+        "dest": MODELS_DIR / "BFM_Fitting.zip",
+        "desc": "SadTalker BFM zip",
     },
 }
 

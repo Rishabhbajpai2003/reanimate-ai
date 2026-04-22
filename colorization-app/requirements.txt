@@ -8,12 +8,12 @@ gunicorn>=21.2.0
 opencv-python==4.8.1.78
 opencv-contrib-python==4.8.1.78
 Pillow>=10.2.0
-numpy==1.26.4
+numpy==1.23.5
 scipy==1.10.1
 
 # ─── Deep Learning ────────────────────────────────────────────────────────────
-torch>=2.2.0
-torchvision>=0.17.0
+torch==2.0.1
+torchvision==0.15.2
 # For GPU: pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
 
 # ─── Real-ESRGAN ──────────────────────────────────────────────────────────────

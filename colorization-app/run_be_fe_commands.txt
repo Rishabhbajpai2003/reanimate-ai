@@ -12,7 +12,7 @@ FRONTEND_PORT=3000
 echo "==> Project root: $ROOT_DIR"
 
 # =========================
-# Kill ports and processes safely
+# Kill old processes
 # =========================
 echo "==> Cleaning old processes..."
 lsof -ti tcp:$BACKEND_PORT | xargs kill -9 2>/dev/null || true
@@ -30,97 +30,150 @@ if ! command -v python3.11 >/dev/null 2>&1; then
   exit 1
 fi
 
-echo "==> Recreating virtual environment"
-rm -rf .venv
-python3.11 -m venv .venv
-
-echo "==> Installing Python dependencies"
-.venv/bin/python -m pip install --upgrade pip
-.venv/bin/pip install setuptools wheel
-# Install basicsr from git to avoid the PyPI build error (KeyError: '__version__')
-.venv/bin/pip install git+https://github.com/XPixelGroup/BasicSR.git@master
-.venv/bin/pip install -r ../requirements.txt
+if [ ! -d ".venv" ]; then
+    echo "==> Creating backend virtual environment"
+    python3.11 -m venv .venv
+fi
 
 # =========================
-# Models setup (STRICT)
+# Install backend deps (ONCE)
+# =========================
+if [ ! -f ".venv/.installed" ]; then
+  echo "==> Installing backend dependencies..."
+
+  .venv/bin/pip install --upgrade pip
+  .venv/bin/pip install wheel packaging
+  .venv/bin/pip install git+https://github.com/XPixelGroup/BasicSR.git@master
+  .venv/bin/pip install -r "$ROOT_DIR/requirements.txt"
+
+  touch .venv/.installed
+else
+  echo "✓ Backend dependencies already installed"
+fi
+
+# =========================
+# Models setup (NO RE-DOWNLOAD)
 # =========================
 echo "==> Setting up models..."
-
-# Use the downloader script for everything to ensure consistency
-.venv/bin/python download_models.py --all
-
-# =========================
-# Install CodeFormer repo
-# =========================
-cd "$ROOT_DIR"
-
-if [ ! -d "CodeFormer" ]; then
-  echo "==> Cloning CodeFormer"
-  git clone https://github.com/sczhou/CodeFormer.git
+if [ ! -d "$BACKEND_DIR/models/BFM" ]; then
+  .venv/bin/python download_models.py --all
+else
+  echo "✓ Models already exist — skipping download"
 fi
 
-echo "==> Installing CodeFormer deps"
-cd CodeFormer
-"$BACKEND_DIR/.venv/bin/pip" install -r requirements.txt || true
 # =========================
-# Install SadTalker repo
+# Clone repos if missing
 # =========================
 cd "$ROOT_DIR"
+for repo in "CodeFormer" "SadTalker"; do
+  if [ ! -d "$repo" ]; then
+    echo "==> Cloning $repo"
+    git clone "https://github.com/$( [ "$repo" == "CodeFormer" ] && echo "sczhou" || echo "OpenTalker" )/$repo.git"
+  fi
+done
 
-if [ ! -d "SadTalker" ]; then
-  echo "==> Cloning SadTalker"
-  git clone https://github.com/OpenTalker/SadTalker.git
+# =========================
+# SadTalker separate env (CRITICAL)
+# =========================
+echo "==> Setting up SadTalker environment"
+
+if [ ! -d "$SADTALKER_DIR/sadtalker_env" ]; then
+  python3.11 -m venv "$SADTALKER_DIR/sadtalker_env"
+
+  source "$SADTALKER_DIR/sadtalker_env/bin/activate"
+  pip install --upgrade pip
+  pip install -r "$SADTALKER_DIR/requirements.txt"
+  deactivate
+else
+  echo "✓ SadTalker env already exists"
 fi
 
-# Install all Python dependencies in a single pass to resolve conflicts cleanly
-echo "==> Installing Python dependencies (this may take a minute)..."
-"$BACKEND_DIR/.venv/bin/pip" install wheel packaging
-"$BACKEND_DIR/.venv/bin/pip" install git+https://github.com/XPixelGroup/BasicSR.git@master
-"$BACKEND_DIR/.venv/bin/pip" install -r "$SADTALKER_DIR/requirements.txt"
-"$BACKEND_DIR/.venv/bin/pip" install -r "$ROOT_DIR/requirements.txt"
+# =========================
+# Link models (space saving)
+# =========================
+echo "==> Linking models"
 
-# Patch: Copy missing CodeFormer archs to the venv's basicsr
-echo "==> Patching basicsr with CodeFormer archs"
-cd "$ROOT_DIR/CodeFormer"
-cp -v basicsr/archs/codeformer_arch.py "$BACKEND_DIR/.venv/lib/python3.11/site-packages/basicsr/archs/"
-cp -v basicsr/archs/vqgan_arch.py "$BACKEND_DIR/.venv/lib/python3.11/site-packages/basicsr/archs/"
+mkdir -p "$SADTALKER_DIR/gfpgan/weights"
+mkdir -p "$SADTALKER_DIR/checkpoints"
+mkdir -p "$ROOT_DIR/CodeFormer/weights/CodeFormer"
+
+ln -sf "$BACKEND_DIR/models/GFPGANv1.4.pth" "$SADTALKER_DIR/gfpgan/weights/" || true
+ln -sf "$BACKEND_DIR/models/detection_Resnet50_Final.pth" "$SADTALKER_DIR/gfpgan/weights/" || true
+ln -sf "$BACKEND_DIR/models/alignment_WFLW_4HG.pth" "$SADTALKER_DIR/gfpgan/weights/" || true
+ln -sf "$BACKEND_DIR/models/parsing_parsenet.pth" "$SADTALKER_DIR/gfpgan/weights/" || true
+
+ln -sf "$BACKEND_DIR/models/SadTalker_V0.0.2_256.safetensors" "$SADTALKER_DIR/checkpoints/" || true
+ln -sf "$BACKEND_DIR/models/SadTalker_V0.0.2_512.safetensors" "$SADTALKER_DIR/checkpoints/" || true
+ln -sf "$BACKEND_DIR/models/mapping_00109-model.pth.tar" "$SADTALKER_DIR/checkpoints/" || true
+ln -sf "$BACKEND_DIR/models/mapping_00229-model.pth.tar" "$SADTALKER_DIR/checkpoints/" || true
+
+ln -sf "$BACKEND_DIR/models/codeformer.pth" "$ROOT_DIR/CodeFormer/weights/CodeFormer/" || true
+
+# =========================
+# Cleanup
+# =========================
+echo "==> Cleaning temp files"
+rm -rf "$SADTALKER_DIR/checkpoints/__MACOSX" 2>/dev/null || true
+
+# =========================
+# Patch basicsr
+# =========================
+echo "==> Patching basicsr"
+cp -v "$ROOT_DIR/CodeFormer/basicsr/archs/"*arch.py \
+"$BACKEND_DIR/.venv/lib/python3.11/site-packages/basicsr/archs/" \
+2>/dev/null || true
 
 # =========================
 # Frontend setup
 # =========================
 echo "==> Frontend setup"
 cd "$FRONTEND_DIR"
-npm install
+
+if [ ! -d "node_modules" ]; then
+  npm install
+else
+  echo "✓ Frontend already installed"
+fi
 
 # =========================
-# Environment variables
+# ENV
 # =========================
 export HF_HUB_OFFLINE=1
 export TORCH_HOME="$BACKEND_DIR/models"
 export PYTHONPATH="$BACKEND_DIR"
 
 # =========================
-# Run services
+# Run backend
 # =========================
 echo "==> Starting backend"
 cd "$BACKEND_DIR"
-# Use a fresh log file and ensure it exists
+
 cat /dev/null > "$ROOT_DIR/backend.log"
 nohup .venv/bin/python app.py >> "$ROOT_DIR/backend.log" 2>&1 &
 
+# =========================
+# Run frontend
+# =========================
 echo "==> Starting frontend"
 cd "$FRONTEND_DIR"
+
 nohup npm run dev -- --host 0.0.0.0 --port $FRONTEND_PORT > "$ROOT_DIR/frontend.log" 2>&1 &
 
-echo "==> Waiting for backend to initialize (this may take a while)..."
-MAX_RETRIES=24 # Increase to 120 seconds (5s * 24)
+# =========================
+# Wait for backend
+# =========================
+echo "==> Waiting for backend..."
+
+MAX_RETRIES=24
 COUNT=0
+
 until curl -s "http://localhost:$BACKEND_PORT/api/health" > /dev/null; do
     sleep 5
     COUNT=$((COUNT + 1))
-    echo "  ...still waiting ($((COUNT * 5))s)"
+    echo "  ...waiting ($((COUNT * 5))s)"
+
     if [ $COUNT -ge $MAX_RETRIES ]; then
-        echo "⚠️ Backend did not respond after 120s (check backend.log)"
+        echo "⚠️ Backend not ready (check logs)"
         break
     fi
 done
