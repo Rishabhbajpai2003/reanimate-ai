@@ -54,16 +54,37 @@ models/
 *.log
 
 # =========================
-# Images / generated files
+# Generated outputs (keep repo clean)
 # =========================
-*.jpg
-*.jpeg
-*.png
-*.gif
+# Backend runtime artifacts
+colorization-app/backend/static/results/**
+colorization-app/backend/static/uploads/**
+colorization-app/backend/static/tmp/**
+!colorization-app/backend/static/results/.gitkeep
+!colorization-app/backend/static/uploads/.gitkeep
 
-*_input.*
-_smoke_*
-_preset_*
-_ai_*
-_frame_*
-_m2_*
+# SadTalker / CodeFormer runtime outputs (these repos are cloned locally)
+colorization-app/SadTalker/
+colorization-app/CodeFormer/
+colorization-app/SadTalker/results/**
+colorization-app/CodeFormer/results/**
+colorization-app/**/checkpoints/**
+colorization-app/**/weights/**
+
+# Local experiments
+colorization-app/scratch/**
+
+# Local demo/test assets (not part of product)
+colorization-app/backend/_*.png
+colorization-app/backend/_*.jpg
+colorization-app/backend/_*.gif
+colorization-app/backend/*input*.jpg
+colorization-app/backend/*output*.jpg
+colorization-app/backend/test_out.gif
+lena.jpg
+
+# Frontend local dev artifacts
+colorization-app/frontend/cartoon_input.jpg
+
+# Legacy local samples (use frontend/public/sample_assets instead)
+colorization-app/sample_assets/
