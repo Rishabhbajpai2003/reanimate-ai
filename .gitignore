@@ -20,6 +20,8 @@ __pycache__/
 venv/
 env/
 ENV/
+.venv310/
+**/.venv310/
 
 # =========================
 # Node / Frontend
