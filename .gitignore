@@ -88,3 +88,16 @@ colorization-app/frontend/cartoon_input.jpg
 
 # Legacy local samples (use frontend/public/sample_assets instead)
 colorization-app/sample_assets/
+
+# Common scratch/output name patterns
+*_input.*
+_smoke_*
+_preset_*
+_ai_*
+_frame_*
+_m2_*
+
+# ReAnimateAI generated outputs
+colorization-app/backend/static/results/tmp/
+colorization-app/backend/static/results/*.mp4
+colorization-app/backend/static/results/*.gif

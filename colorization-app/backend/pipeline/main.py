@@ -6,6 +6,10 @@ from typing import Any, Optional, Dict, List
 
 # ─── Monkeypatching & Compatibility Fixes ─────────────────────────────────────
 # 1. Fix torchvision compatibility for basicsr (0.15+)
+# torchvision 0.15+ no longer exposes the legacy
+# `torchvision.transforms.functional_tensor` module, but basicsr still imports
+# that path. Alias it to `torchvision.transforms.functional` so those imports
+# continue to resolve without changing basicsr.
 import torchvision.transforms.functional as tf_f
 sys.modules['torchvision.transforms.functional_tensor'] = tf_f
 
@@ -24,6 +28,7 @@ from .super_res import SuperResModule
 from .colorize  import ColorizeModule
 from .enhance   import EnhanceModule
 from .animate   import AnimateModule
+from .metrics   import compute_image_quality_metrics
 
 logger = logging.getLogger("pipeline.main")
 
@@ -191,10 +196,17 @@ class PipelineController:
         total = sum(s["latency_s"] for s in steps)
         logger.info("Pipeline complete – total %.3fs", total)
 
+        metrics = compute_image_quality_metrics(input_path, final_path)
+
+        for model_name, info in sr_compare_outputs.items():
+            candidate_path = str(Path(output_dir) / info["filename"])
+            info["metrics"] = compute_image_quality_metrics(input_path, candidate_path)
+
         return {
             "final_filename":     final_filename,
             "animation_filename": animation_filename,
             "steps":              steps,
             "intermediates":      intermediates,
             "sr_compare_outputs": sr_compare_outputs,
+            "metrics":            metrics,
         }

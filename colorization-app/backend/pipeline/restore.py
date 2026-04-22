@@ -39,7 +39,7 @@ class RestoreModule:
         except ImportError as err:
             logger.info("realesrgan/basicsr not installed or import error: %s – using OpenCV fallback", err)
         except Exception as exc:
-            logger.warning("Real-ESRGAN load error: %s", exc)
+            logger.warning("GFPGAN load error: %s", exc)
 
     # ── Public API ────────────────────────────────────────────────────────────
     def process(self, input_path: str, output_path: str) -> str:

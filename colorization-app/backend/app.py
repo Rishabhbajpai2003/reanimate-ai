@@ -188,9 +188,11 @@ def upload():
                 "backend": meta.get("backend", "unknown"),
                 "latency_s": meta.get("latency_s", 0),
                 "error": meta.get("error"),
+                "metrics": meta.get("metrics"),
             }
             for model, meta in result.get("sr_compare_outputs", {}).items()
         },
+        "metrics": result.get("metrics"),
     }
     return jsonify(response), 200
 
@@ -233,9 +235,7 @@ def server_error(exc):
 # ─── Entry Point ──────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-
-    # 🔥 FORCE production mode (no reload, no double imports)
-    debug = False
+    debug = os.environ.get("FLASK_ENV", "development") == "development"
 
     logger.info("Starting ReAnimateAI on port %d (debug=%s)", port, debug)
     app.run(host="0.0.0.0", port=port, debug=debug)

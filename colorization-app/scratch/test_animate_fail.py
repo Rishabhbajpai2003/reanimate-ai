@@ -1,6 +1,7 @@
 import sys
 from pathlib import Path
 import cv2
+import numpy as np
 
 # Add backend to path
 sys.path.append(str(Path(__file__).parent.parent / "backend"))
@@ -23,5 +24,4 @@ def test_animate():
         traceback.print_exc()
 
 if __name__ == "__main__":
-    import numpy as np
     test_animate()

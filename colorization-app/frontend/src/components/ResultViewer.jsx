@@ -14,6 +14,12 @@ const SR_MODEL_LABEL = {
   hat: 'HAT',
 }
 
+const SR_BACKEND_LABEL = {
+  native: 'native model',
+  'native-cpu-fallback': 'native model (CPU fallback)',
+  'fallback-opencv': 'OpenCV fallback',
+}
+
 function getStepMeta(stepName) {
   if (stepName.startsWith('super_res:')) {
     const model = stepName.split(':')[1] || ''
@@ -135,9 +141,18 @@ function SrComparisonGrid({ outputs, activeModel, onSelect }) {
               <div className="sr-output-meta">
                 <span>{SR_MODEL_LABEL[model] || model}</span>
                 <small>
-                  {meta.backend === 'native' ? 'native model' : 'fallback backend'}
+                  {SR_BACKEND_LABEL[meta.backend] || meta.backend || 'unknown backend'}
                   {typeof meta.latency_s === 'number' ? ` · ${meta.latency_s}s` : ''}
                 </small>
+                {!!meta.metrics && (
+                  <small>
+                    {typeof meta.metrics.psnr === 'number' ? `PSNR ${meta.metrics.psnr} dB` : 'PSNR n/a'}
+                    {' · '}
+                    {typeof meta.metrics.ssim === 'number' ? `SSIM ${meta.metrics.ssim}` : 'SSIM n/a'}
+                    {' · '}
+                    {typeof meta.metrics.lpips === 'number' ? `LPIPS ${meta.metrics.lpips}` : 'LPIPS n/a'}
+                  </small>
+                )}
               </div>
             </button>
           )
@@ -224,6 +239,30 @@ export default function ResultViewer({ result, originalSrc }) {
   const hasSrCompare = Object.keys(result.sr_compare_outputs ?? {}).length > 0
   const activeSrUrl = selectedSrModel && result.sr_compare_outputs?.[selectedSrModel]?.url
   const displayUrl = activeSrUrl || result.result_url
+  const metrics = result.metrics || {}
+
+  const metricRows = [
+    {
+      key: 'psnr',
+      label: 'PSNR',
+      unit: 'dB',
+      hint: 'Higher is better',
+    },
+    {
+      key: 'ssim',
+      label: 'SSIM',
+      unit: '',
+      hint: 'Higher is better',
+    },
+    {
+      key: 'lpips',
+      label: 'LPIPS',
+      unit: '',
+      hint: 'Lower is better',
+    },
+  ]
+
+  const hasMetricValues = metricRows.some(({ key }) => typeof metrics[key] === 'number')
 
   return (
     <div className="card result-section" id="result-section">
@@ -281,6 +320,33 @@ export default function ResultViewer({ result, originalSrc }) {
       >
         ⬇ Download Enhanced Portrait
       </a>
+
+      <div className="metrics-section">
+        <div className="card-title" style={{ marginBottom: '0.55rem' }}>
+          <span>📊</span> Evaluation Metrics
+        </div>
+        <p className="metrics-caption">Computed against the uploaded input image.</p>
+        <div className="metrics-grid">
+          {metricRows.map((m) => {
+            const raw = metrics[m.key]
+            const hasValue = typeof raw === 'number' && Number.isFinite(raw)
+            const display = hasValue ? `${raw}${m.unit ? ` ${m.unit}` : ''}` : 'n/a'
+
+            return (
+              <div className="metric-card" key={m.key}>
+                <div className="metric-label">{m.label}</div>
+                <div className="metric-value">{display}</div>
+                <div className="metric-hint">{m.hint}</div>
+              </div>
+            )
+          })}
+        </div>
+        {!hasMetricValues && (
+          <p className="metrics-warning">
+            Metrics are unavailable for this run. Install optional metric dependencies to enable full evaluation.
+          </p>
+        )}
+      </div>
 
       {/* ── Animation GIF / Video ──────────────────────────────────────────── */}
       {hasAnimation && (

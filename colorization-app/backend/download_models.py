@@ -11,6 +11,7 @@ import os
 import sys
 import urllib.request
 from pathlib import Path
+import zipfile
 
 MODELS_DIR = Path(__file__).parent / "models"
 MODELS_DIR.mkdir(exist_ok=True)
@@ -109,7 +110,6 @@ MODELS = {
 # ─── Download Helpers ─────────────────────────────────────────────────────────
 
 def _unzip(path: Path, dest_dir: Path):
-    import zipfile
     print(f"   Unzipping {path} to {dest_dir} …")
     with zipfile.ZipFile(path, 'r') as zip_ref:
         zip_ref.extractall(dest_dir)
