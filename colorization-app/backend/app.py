@@ -16,6 +16,7 @@ from werkzeug.exceptions import RequestEntityTooLarge
 
 from pipeline.main import PipelineController
 from pipeline.super_res import normalize_model_name
+from pipeline.color_compare import normalize_color_model_name
 
 # ─── Logging ──────────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -123,6 +124,32 @@ def upload():
 
         return canonical or ["realesrgan"]
 
+    def parse_color_models(raw: str):
+        if not raw:
+            return ["eccv16"]
+
+        parsed = None
+        try:
+            parsed = json.loads(raw)
+        except Exception:
+            parsed = [p.strip() for p in raw.split(",") if p.strip()]
+
+        if isinstance(parsed, str):
+            parsed = [parsed]
+
+        if not isinstance(parsed, list):
+            parsed = ["eccv16"]
+
+        seen = set()
+        canonical = []
+        for m in parsed:
+            key = normalize_color_model_name(str(m))
+            if key and key not in seen:
+                seen.add(key)
+                canonical.append(key)
+
+        return canonical or ["eccv16"]
+
     options = {
         "restore":   flag("restore",   True),
         "super_res": flag("super_res", True),
@@ -131,6 +158,8 @@ def upload():
         "animate":   flag("animate",   False),
         "sr_compare": flag("sr_compare", False),
         "sr_models": parse_sr_models(request.form.get("sr_models", "")),
+        "color_compare": flag("color_compare", False),
+        "color_models": parse_color_models(request.form.get("color_models", "")),
     }
 
     # ── Save uploaded image ────────────────────────────────────────────────
@@ -191,6 +220,16 @@ def upload():
                 "metrics": meta.get("metrics"),
             }
             for model, meta in result.get("sr_compare_outputs", {}).items()
+        },
+        "color_compare_outputs": {
+            model: {
+                "url": build_result_url(meta["filename"]),
+                "backend": meta.get("backend", "unknown"),
+                "latency_s": meta.get("latency_s", 0),
+                "error": meta.get("error"),
+                "metrics": meta.get("metrics"),
+            }
+            for model, meta in result.get("color_compare_outputs", {}).items()
         },
         "metrics": result.get("metrics"),
     }

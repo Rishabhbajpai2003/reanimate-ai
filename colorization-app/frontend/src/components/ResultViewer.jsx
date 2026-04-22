@@ -20,6 +20,20 @@ const SR_BACKEND_LABEL = {
   'fallback-opencv': 'OpenCV fallback',
 }
 
+const COLOR_MODEL_LABEL = {
+  eccv16: 'Zhang (ECCV16)',
+  deoldify_artistic: 'DeOldify (Artistic)',
+  deoldify_stable: 'DeOldify (Stable)',
+  ddcolor: 'DDColor (ICCV23)',
+}
+
+const COLOR_BACKEND_LABEL = {
+  'opencv-dnn': 'OpenCV DNN',
+  deoldify: 'DeOldify',
+  'modelscope-ddcolor': 'DDColor (ModelScope)',
+  'opencv-dnn-fallback': 'fallback (OpenCV DNN)',
+}
+
 function getStepMeta(stepName) {
   if (stepName.startsWith('super_res:')) {
     const model = stepName.split(':')[1] || ''
@@ -101,7 +115,7 @@ function StepTimeline({ steps }) {
 
 /* ── Intermediate Grid ───────────────────────────────────────────────────────── */
 function IntermediatesGrid({ intermediates }) {
-  const entries = Object.entries(intermediates).filter(([k]) => k !== 'animate' && !k.startsWith('super_res_'))
+  const entries = Object.entries(intermediates).filter(([k]) => k !== 'animate' && !k.startsWith('super_res_') && !k.startsWith('colorize_'))
   if (!entries.length) return null
   return (
     <div className="intermediates-grid">
@@ -211,6 +225,50 @@ function AnimationViewer({ animationUrl }) {
   )
 }
 
+function ColorComparisonGrid({ outputs, activeModel, onSelect }) {
+  const entries = Object.entries(outputs || {})
+  if (!entries.length) return null
+
+  return (
+    <div className="sr-comparison-section">
+      <div className="card-title" style={{ marginTop: '1.25rem' }}>
+        <span>🎨</span> Colorization Model Comparison
+      </div>
+      <div className="sr-comparison-grid">
+        {entries.map(([model, meta]) => {
+          const isActive = activeModel === model
+          return (
+            <button
+              key={model}
+              type="button"
+              className={`sr-output-card ${isActive ? 'active' : ''}`}
+              onClick={() => onSelect(model)}
+            >
+              <img src={meta.url} alt={`${COLOR_MODEL_LABEL[model] || model} output`} loading="lazy" />
+              <div className="sr-output-meta">
+                <span>{COLOR_MODEL_LABEL[model] || model}</span>
+                <small>
+                  {COLOR_BACKEND_LABEL[meta.backend] || meta.backend || 'unknown backend'}
+                  {typeof meta.latency_s === 'number' ? ` · ${meta.latency_s}s` : ''}
+                </small>
+                {!!meta.metrics && (
+                  <small>
+                    {typeof meta.metrics.psnr === 'number' ? `PSNR ${meta.metrics.psnr} dB` : 'PSNR n/a'}
+                    {' · '}
+                    {typeof meta.metrics.ssim === 'number' ? `SSIM ${meta.metrics.ssim}` : 'SSIM n/a'}
+                    {' · '}
+                    {typeof meta.metrics.lpips === 'number' ? `LPIPS ${meta.metrics.lpips}` : 'LPIPS n/a'}
+                  </small>
+                )}
+              </div>
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 /* ── Main Result Viewer ─────────────────────────────────────────────────────── */
 export default function ResultViewer({ result, originalSrc }) {
   const [showIntermediates, setShowIntermediates] = useState(false)
@@ -218,6 +276,12 @@ export default function ResultViewer({ result, originalSrc }) {
   const [selectedSrModel, setSelectedSrModel]     = useState(() => {
     const models = Object.keys(result?.sr_compare_outputs || {})
     if (models.includes('realesrgan')) return 'realesrgan'
+    return models[0] || null
+  })
+
+  const [selectedColorModel, setSelectedColorModel] = useState(() => {
+    const models = Object.keys(result?.color_compare_outputs || {})
+    if (models.includes('eccv16')) return 'eccv16'
     return models[0] || null
   })
 
@@ -230,6 +294,15 @@ export default function ResultViewer({ result, originalSrc }) {
     setSelectedSrModel(models.includes('realesrgan') ? 'realesrgan' : models[0])
   }, [result])
 
+  useEffect(() => {
+    const models = Object.keys(result?.color_compare_outputs || {})
+    if (!models.length) {
+      setSelectedColorModel(null)
+      return
+    }
+    setSelectedColorModel(models.includes('eccv16') ? 'eccv16' : models[0])
+  }, [result])
+
   if (!result) return null
 
   const hasIntermediates = Object.keys(result.intermediates ?? {}).filter(
@@ -237,8 +310,10 @@ export default function ResultViewer({ result, originalSrc }) {
   ).length > 0
   const hasAnimation = !!result.animation_url
   const hasSrCompare = Object.keys(result.sr_compare_outputs ?? {}).length > 0
+  const hasColorCompare = Object.keys(result.color_compare_outputs ?? {}).length > 0
   const activeSrUrl = selectedSrModel && result.sr_compare_outputs?.[selectedSrModel]?.url
-  const displayUrl = activeSrUrl || result.result_url
+  const activeColorUrl = selectedColorModel && result.color_compare_outputs?.[selectedColorModel]?.url
+  const displayUrl = activeSrUrl || activeColorUrl || result.result_url
   const metrics = result.metrics || {}
 
   const metricRows = [
@@ -358,6 +433,14 @@ export default function ResultViewer({ result, originalSrc }) {
           outputs={result.sr_compare_outputs}
           activeModel={selectedSrModel}
           onSelect={setSelectedSrModel}
+        />
+      )}
+
+      {hasColorCompare && (
+        <ColorComparisonGrid
+          outputs={result.color_compare_outputs}
+          activeModel={selectedColorModel}
+          onSelect={setSelectedColorModel}
         />
       )}
 

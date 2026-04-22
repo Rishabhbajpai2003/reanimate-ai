@@ -4,28 +4,41 @@ import logging
 from pathlib import Path
 from typing import Any, Optional, Dict, List
 
+_bootstrap_logger = logging.getLogger("pipeline.bootstrap")
+
 # ─── Monkeypatching & Compatibility Fixes ─────────────────────────────────────
 # 1. Fix torchvision compatibility for basicsr (0.15+)
 # torchvision 0.15+ no longer exposes the legacy
 # `torchvision.transforms.functional_tensor` module, but basicsr still imports
 # that path. Alias it to `torchvision.transforms.functional` so those imports
 # continue to resolve without changing basicsr.
-import torchvision.transforms.functional as tf_f
-sys.modules['torchvision.transforms.functional_tensor'] = tf_f
+try:
+    import torchvision.transforms.functional as tf_f
+
+    sys.modules["torchvision.transforms.functional_tensor"] = tf_f
+except Exception as exc:
+    _bootstrap_logger.warning("torchvision not available for compatibility patch (%s)", exc)
 
 # 2. Fix torch.load for newer versions (2.0+)
-import torch
-_original_load = torch.load
-def _safe_load(*args, **kwargs):
-    if 'weights_only' not in kwargs:
-        kwargs['weights_only'] = False
-    return _original_load(*args, **kwargs)
-torch.load = _safe_load
+try:
+    import torch
+
+    _original_load = torch.load
+
+    def _safe_load(*args, **kwargs):
+        if "weights_only" not in kwargs:
+            kwargs["weights_only"] = False
+        return _original_load(*args, **kwargs)
+
+    torch.load = _safe_load
+except Exception as exc:
+    _bootstrap_logger.warning("torch not available for load patch (%s)", exc)
 
 # ─── Pipeline Imports ─────────────────────────────────────────────────────────
 from .restore   import RestoreModule
 from .super_res import SuperResModule
 from .colorize  import ColorizeModule
+from .color_compare import ColorCompareModule, normalize_color_model_name
 from .enhance   import EnhanceModule
 from .animate   import AnimateModule
 from .metrics   import compute_image_quality_metrics
@@ -42,6 +55,7 @@ class PipelineController:
         self.restore_mod   = RestoreModule()
         self.super_res_mod = SuperResModule()
         self.colorize_mod  = ColorizeModule()
+        self.color_compare_mod = ColorCompareModule()
         self.enhance_mod   = EnhanceModule()
         self.animate_mod   = AnimateModule()
         logger.info("All modules ready in %.2fs", time.perf_counter() - t0)
@@ -67,13 +81,16 @@ class PipelineController:
         steps: list[dict] = []
         intermediates: dict[str, str] = {}
         sr_compare_outputs: dict[str, dict] = {}
+        color_compare_outputs: dict[str, dict] = {}
 
         sr_compare = bool(options.get("sr_compare", False) and options.get("super_res", True))
         sr_models: List[str] = options.get("sr_models") or ["realesrgan"]
 
+        color_compare = bool(options.get("color_compare", False) and options.get("colorize", True))
+        color_models: List[str] = options.get("color_models") or ["eccv16"]
+
         stages = [
             ("restore",   options.get("restore",   True),  self.restore_mod),
-            ("colorize",  options.get("colorize",  True),  self.colorize_mod),
             ("enhance",   options.get("enhance",   True),  self.enhance_mod),
         ]
 
@@ -97,6 +114,74 @@ class PipelineController:
                 latency = round(time.perf_counter() - t0, 3)
                 logger.warning("  ✗ %s FAILED (%.3fs): %s — using previous output", step_name, latency, exc)
                 steps.append({"step": step_name, "latency_s": latency, "skipped": False, "error": str(exc)})
+
+        # ── Colorization (single or compare mode) ───────────────────────────
+        if not options.get("colorize", True):
+            steps.append({"step": "colorize", "latency_s": 0, "skipped": True})
+            logger.info("Skipping colorize")
+        elif color_compare:
+            # Canonicalize model names early for nicer logs/keys.
+            canonical: List[str] = []
+            for m in color_models:
+                key = normalize_color_model_name(str(m))
+                if key and key not in canonical:
+                    canonical.append(key)
+            if not canonical:
+                canonical = ["eccv16"]
+
+            logger.info("Running colorize compare for models: %s", ", ".join(canonical))
+            t0 = time.perf_counter()
+            try:
+                outputs = self.color_compare_mod.process_compare(
+                    input_path=current_path,
+                    output_dir=output_dir,
+                    job_id=job_id,
+                    model_names=canonical,
+                )
+                compare_latency = round(time.perf_counter() - t0, 3)
+
+                default_model = "eccv16" if "eccv16" in outputs else next(iter(outputs))
+                default_filename = outputs[default_model]["filename"]
+                current_path = str(Path(output_dir) / default_filename)
+
+                for model_name, info in outputs.items():
+                    step_name = f"colorize:{model_name}"
+                    steps.append({
+                        "step": step_name,
+                        "latency_s": info.get("latency_s", compare_latency),
+                        "skipped": False,
+                        "backend": info.get("backend", "unknown"),
+                    })
+                    inter_key = f"colorize_{model_name}"
+                    intermediates[inter_key] = info["filename"]
+                    color_compare_outputs[model_name] = {
+                        "filename": info["filename"],
+                        "backend": info.get("backend", "unknown"),
+                        "latency_s": info.get("latency_s", 0),
+                    }
+                    if "error" in info:
+                        color_compare_outputs[model_name]["error"] = info["error"]
+
+                logger.info("  ✓ colorize compare done in %.3fs", compare_latency)
+            except Exception as exc:
+                compare_latency = round(time.perf_counter() - t0, 3)
+                logger.warning("  ✗ colorize compare FAILED (%.3fs): %s", compare_latency, exc)
+                steps.append({"step": "colorize", "latency_s": compare_latency, "skipped": False, "error": str(exc)})
+        else:
+            logger.info("Running colorize …")
+            t0 = time.perf_counter()
+            try:
+                out_filename = f"{job_id}_colorize.png"
+                out_path = str(Path(output_dir) / out_filename)
+                current_path = self.colorize_mod.process(current_path, out_path)
+                latency = round(time.perf_counter() - t0, 3)
+                steps.append({"step": "colorize", "latency_s": latency, "skipped": False})
+                intermediates["colorize"] = out_filename
+                logger.info("  ✓ colorize done in %.3fs → %s", latency, out_path)
+            except Exception as exc:
+                latency = round(time.perf_counter() - t0, 3)
+                logger.warning("  ✗ colorize FAILED (%.3fs): %s — using previous output", latency, exc)
+                steps.append({"step": "colorize", "latency_s": latency, "skipped": False, "error": str(exc)})
 
         # ── Super resolution (single or compare mode) ───────────────────────
         if not options.get("super_res", True):
@@ -198,6 +283,10 @@ class PipelineController:
 
         metrics = compute_image_quality_metrics(input_path, final_path)
 
+        for model_name, info in color_compare_outputs.items():
+            candidate_path = str(Path(output_dir) / info["filename"])
+            info["metrics"] = compute_image_quality_metrics(input_path, candidate_path)
+
         for model_name, info in sr_compare_outputs.items():
             candidate_path = str(Path(output_dir) / info["filename"])
             info["metrics"] = compute_image_quality_metrics(input_path, candidate_path)
@@ -208,5 +297,6 @@ class PipelineController:
             "steps":              steps,
             "intermediates":      intermediates,
             "sr_compare_outputs": sr_compare_outputs,
+            "color_compare_outputs": color_compare_outputs,
             "metrics":            metrics,
         }

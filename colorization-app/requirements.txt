@@ -37,3 +37,9 @@ lpips>=0.1.4
 mediapipe>=0.10.0
 imageio>=2.34.0
 imageio-ffmpeg>=0.4.9
+
+# ─── Optional: Colorization model comparison ───────────────────────────────────
+# DeOldify (Artistic/Stable)
+deoldify>=0.0.1
+# DDColor (ICCV 2023) via ModelScope pipeline
+modelscope>=1.14.0

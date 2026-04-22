@@ -22,12 +22,20 @@ const DEFAULT_OPTIONS = {
   enhance:   true,
   animate:   false,
   sr_compare: false,
+  color_compare: false,
 }
 
 const DEFAULT_SR_MODELS = {
   realesrgan: true,
   swinir: true,
   hat: true,
+}
+
+const DEFAULT_COLOR_MODELS = {
+  eccv16: true,
+  deoldify_artistic: true,
+  deoldify_stable: false,
+  ddcolor: true,
 }
 
 export default function App() {
@@ -39,6 +47,7 @@ export default function App() {
   const [steps,     setSteps]     = useState([])
   const [health,    setHealth]    = useState(null)
   const [srModels,  setSrModels]  = useState(DEFAULT_SR_MODELS)
+  const [colorModels, setColorModels] = useState(DEFAULT_COLOR_MODELS)
 
   // ── Health check on mount ──────────────────────────────────────────────
   useEffect(() => {
@@ -71,9 +80,14 @@ export default function App() {
         .filter(([, enabled]) => enabled)
         .map(([model]) => model)
 
+      const selectedColorModels = Object.entries(colorModels)
+        .filter(([, enabled]) => enabled)
+        .map(([model]) => model)
+
       const data = await processImage(file, {
         ...options,
         sr_models: selectedSrModels,
+        color_models: selectedColorModels,
       })
       setResult(data)
       setSteps(data.steps ?? [])
@@ -169,6 +183,8 @@ export default function App() {
               onChange={setOptions}
               srModels={srModels}
               onSrModelsChange={setSrModels}
+              colorModels={colorModels}
+              onColorModelsChange={setColorModels}
             />
           </div>
 

@@ -37,9 +37,24 @@ const SR_MODELS = [
   { key: 'hat', label: 'HAT', hint: 'Hybrid attention transformer' },
 ]
 
-export default function OptionsPanel({ options, onChange, srModels, onSrModelsChange }) {
+const COLOR_MODELS = [
+  { key: 'eccv16', label: 'Zhang (ECCV16)', hint: 'Classical baseline (OpenCV DNN)' },
+  { key: 'deoldify_artistic', label: 'DeOldify (Artistic)', hint: 'More vivid colors' },
+  { key: 'deoldify_stable', label: 'DeOldify (Stable)', hint: 'More conservative colors' },
+  { key: 'ddcolor', label: 'DDColor (ICCV23)', hint: 'Modern lightweight colorization' },
+]
+
+export default function OptionsPanel({
+  options,
+  onChange,
+  srModels,
+  onSrModelsChange,
+  colorModels,
+  onColorModelsChange,
+}) {
   const toggle = (key) => onChange({ ...options, [key]: !options[key] })
   const enabledSrModels = Object.entries(srModels).filter(([, v]) => v).map(([k]) => k)
+  const enabledColorModels = Object.entries(colorModels).filter(([, v]) => v).map(([k]) => k)
 
   const toggleSrModel = (modelKey) => {
     const next = { ...srModels, [modelKey]: !srModels[modelKey] }
@@ -47,6 +62,14 @@ export default function OptionsPanel({ options, onChange, srModels, onSrModelsCh
     // Keep at least one SR model selected.
     if (count === 0) return
     onSrModelsChange(next)
+  }
+
+  const toggleColorModel = (modelKey) => {
+    const next = { ...colorModels, [modelKey]: !colorModels[modelKey] }
+    const count = Object.values(next).filter(Boolean).length
+    // Keep at least one color model selected.
+    if (count === 0) return
+    onColorModelsChange(next)
   }
 
   return (
@@ -97,6 +120,39 @@ export default function OptionsPanel({ options, onChange, srModels, onSrModelsCh
                   type="button"
                   className={`sr-model-chip ${selected ? 'selected' : ''}`}
                   onClick={() => toggleSrModel(m.key)}
+                  disabled={disabled}
+                  aria-pressed={selected}
+                >
+                  <span>{m.label}</span>
+                  <small>{m.hint}</small>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {options.colorize && (
+        <div className="sr-controls">
+          <div className="sr-headline">🎨 Colorization Comparison</div>
+          <div className="sr-compare-toggle" onClick={() => toggle('color_compare')}>
+            <div className="option-info">
+              <span className="option-name">Compare Multiple Colorization Models</span>
+              <span className="option-desc">Generate one output per selected model</span>
+            </div>
+            <div className={`toggle-switch ${options.color_compare ? 'on' : ''}`} aria-hidden="true" />
+          </div>
+
+          <div className="sr-model-grid">
+            {COLOR_MODELS.map((m) => {
+              const selected = !!colorModels[m.key]
+              const disabled = !selected && enabledColorModels.length === 1
+              return (
+                <button
+                  key={m.key}
+                  type="button"
+                  className={`sr-model-chip ${selected ? 'selected' : ''}`}
+                  onClick={() => toggleColorModel(m.key)}
                   disabled={disabled}
                   aria-pressed={selected}
                 >
