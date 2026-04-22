@@ -14,7 +14,17 @@ import numpy as np
 logger = logging.getLogger("pipeline.animate")
 
 SADTALKER_DIR = Path(__file__).parent.parent.parent / "SadTalker"
-SADTALKER_PYTHON = SADTALKER_DIR / "sadtalker_env" / "bin" / "python"
+
+def _resolve_sadtalker_python() -> Path:
+    # Windows venv: sadtalker_env/Scripts/python.exe
+    # Unix venv   : sadtalker_env/bin/python
+    win_py = SADTALKER_DIR / "sadtalker_env" / "Scripts" / "python.exe"
+    if win_py.exists():
+        return win_py
+    return SADTALKER_DIR / "sadtalker_env" / "bin" / "python"
+
+
+SADTALKER_PYTHON = _resolve_sadtalker_python()
 MODEL_PATH = Path(__file__).parent.parent / "models" / "face_landmarker.task"
 
 FPS = 10
@@ -212,7 +222,6 @@ class AnimateModule:
         except Exception:
             logger.error("Static blink GIF generation failed", exc_info=True)
             raise
-
     def _run_sadtalker(self, img_path, output_path, audio_path):
         try:
             if not audio_path:
@@ -243,7 +252,13 @@ class AnimateModule:
             env["PYTHONPATH"] = str(SADTALKER_DIR)
             env.pop("PYTHONHOME", None)
 
-            subprocess.run(cmd, check=True, cwd=str(SADTALKER_DIR), env=env)
+            logger.info("Running SadTalker in isolated env...")
+            subprocess.run(
+                cmd,
+                check=True,
+                cwd=str(SADTALKER_DIR),
+                env=env,
+            )
 
             mp4_files = sorted(result_dir.rglob("*.mp4"), key=lambda p: p.stat().st_mtime, reverse=True)
             if mp4_files:
