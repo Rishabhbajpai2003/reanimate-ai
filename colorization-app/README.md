@@ -72,7 +72,7 @@ python -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
 
 # Install dependencies
-pip install -r requirements.txt
+pip install -r ../requirements.txt
 
 # Download pretrained models (optional but recommended)
 python download_models.py --all
@@ -294,5 +294,6 @@ Returns result URL for a previously processed job.
 | `libGL.so.1: cannot open` | `apt install libgl1` |
 | Out of memory | Reduce `max_dim` in `restore.py` or use CPU |
 | Colorize DNN not working | Run `python download_models.py --colorize` |
+| Real-ESRGAN shows OpenCV fallback | Ensure `RealESRGAN_x2plus.pth` or `RealESRGAN_x4plus.pth` exists in `backend/models/` and install deps with `pip install -r ../requirements.txt` |
 | Port already in use | Change `PORT` env var |
 | CORS error in browser | Ensure Flask is running on `localhost:5000` |

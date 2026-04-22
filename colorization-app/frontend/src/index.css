@@ -676,6 +676,57 @@ body {
   font-size: 0.7rem;
 }
 
+.metrics-section {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--clr-border);
+}
+
+.metrics-caption {
+  color: var(--clr-text-muted);
+  font-size: 0.78rem;
+  margin-bottom: 0.65rem;
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.65rem;
+}
+
+.metric-card {
+  border: 1px solid var(--clr-border);
+  background: var(--clr-surface-2);
+  border-radius: var(--radius-sm);
+  padding: 0.6rem 0.7rem;
+}
+
+.metric-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--clr-text-muted);
+}
+
+.metric-value {
+  color: var(--clr-text);
+  font-weight: 700;
+  font-size: 0.98rem;
+  margin-top: 0.25rem;
+}
+
+.metric-hint {
+  color: var(--clr-text-dim);
+  font-size: 0.68rem;
+  margin-top: 0.15rem;
+}
+
+.metrics-warning {
+  margin-top: 0.65rem;
+  color: var(--clr-warn);
+  font-size: 0.75rem;
+}
+
 /* ─── Toast ─────────────────────────────────────────────────────────────── */
 .toast-custom {
   font-family: var(--font-sans) !important;

@@ -10,6 +10,7 @@ opencv-contrib-python>=4.9.0
 Pillow>=10.2.0
 numpy>=1.26.0
 scipy>=1.12.0
+scikit-image>=0.22.0
 
 # ─── Deep Learning ────────────────────────────────────────────────────────────
 torch>=2.2.0
@@ -32,3 +33,4 @@ facexlib>=0.3.0
 tqdm>=4.66.0
 requests>=2.31.0
 python-dotenv>=1.0.0
+lpips>=0.1.4

@@ -188,9 +188,11 @@ def upload():
                 "backend": meta.get("backend", "unknown"),
                 "latency_s": meta.get("latency_s", 0),
                 "error": meta.get("error"),
+                "metrics": meta.get("metrics"),
             }
             for model, meta in result.get("sr_compare_outputs", {}).items()
         },
+        "metrics": result.get("metrics"),
     }
     return jsonify(response), 200
 

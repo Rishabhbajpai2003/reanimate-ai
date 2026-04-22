@@ -44,8 +44,12 @@ class SuperResModule:
         self._device = "cpu"
 
         self._upsampler = None
+        self._upsampler_cpu = None
         self._spandrel_loader = None
         self._native_models: Dict[str, object] = {}
+        self._realesrgan_model_path = None
+        self._realesrgan_model_scale = SCALE
+        self._realesrgan_num_blocks = 23
 
         self._init_torch()
         self._try_load_realesrgan()
@@ -70,38 +74,62 @@ class SuperResModule:
             return self._models_dir / "HAT_SRx2_ImageNet-pretrain.pth"
         return self._models_dir / f"RealESRGAN_x{SCALE}plus.pth"
 
+    def _resolve_realesrgan_checkpoint(self):
+        candidates = [
+            (self._models_dir / "RealESRGAN_x2plus.pth", 2, 23),
+            (self._models_dir / "RealESRGAN_x4plus.pth", 4, 23),
+        ]
+        for path, model_scale, num_blocks in candidates:
+            if path.exists():
+                return path, model_scale, num_blocks
+        return None
+
     # ── Real-ESRGAN (optional) ────────────────────────────────────────────────
+    def _build_realesrgan_upsampler(self, device: str):
+        from basicsr.archs.rrdbnet_arch import RRDBNet
+        from realesrgan import RealESRGANer
+
+        if self._realesrgan_model_path is None:
+            raise RuntimeError("Real-ESRGAN checkpoint is not configured")
+
+        model = RRDBNet(
+            num_in_ch=3,
+            num_out_ch=3,
+            num_feat=64,
+            num_block=self._realesrgan_num_blocks,
+            num_grow_ch=32,
+            scale=self._realesrgan_model_scale,
+        )
+        return RealESRGANer(
+            scale=self._realesrgan_model_scale,
+            model_path=str(self._realesrgan_model_path),
+            model=model,
+            tile=400,
+            tile_pad=10,
+            pre_pad=0,
+            half=(device == "cuda"),
+            device=device,
+        )
+
     def _try_load_realesrgan(self):
         try:
             import torch
-            from basicsr.archs.rrdbnet_arch import RRDBNet
-            from realesrgan import RealESRGANer
 
-            model_path = self._model_path("realesrgan")
-            if not model_path.exists():
-                logger.info("Real-ESRGAN model not found – using OpenCV fallback")
+            resolved = self._resolve_realesrgan_checkpoint()
+            if resolved is None:
+                logger.info("Real-ESRGAN checkpoint not found (x2/x4) – using OpenCV fallback")
                 return
 
+            self._realesrgan_model_path, self._realesrgan_model_scale, self._realesrgan_num_blocks = resolved
+
             device = "cuda" if torch.cuda.is_available() else "cpu"
-            model = RRDBNet(
-                num_in_ch=3,
-                num_out_ch=3,
-                num_feat=64,
-                num_block=23,
-                num_grow_ch=32,
-                scale=SCALE,
+            self._upsampler = self._build_realesrgan_upsampler(device)
+            logger.info(
+                "Real-ESRGAN loaded (%s, model x%d) on %s ✓",
+                self._realesrgan_model_path.name,
+                self._realesrgan_model_scale,
+                device,
             )
-            self._upsampler = RealESRGANer(
-                scale=SCALE,
-                model_path=str(model_path),
-                model=model,
-                tile=400,
-                tile_pad=10,
-                pre_pad=0,
-                half=(device == "cuda"),
-                device=device,
-            )
-            logger.info("Real-ESRGAN x%d loaded on %s ✓", SCALE, device)
         except ImportError:
             logger.info("realesrgan/basicsr not installed – using OpenCV fallback")
         except Exception as exc:
@@ -205,7 +233,7 @@ class SuperResModule:
     def _run_model(self, img: np.ndarray, model_name: str):
         if model_name == "realesrgan":
             if self._upsampler is not None:
-                return self._run_realesrgan(img), "native"
+                return self._run_realesrgan(img)
             return self._run_opencv(img, profile="realesrgan"), "fallback-opencv"
 
         if model_name == "swinir":
@@ -222,13 +250,30 @@ class SuperResModule:
         return self._run_opencv(img, profile="realesrgan"), "fallback-opencv"
 
     # ── Real-ESRGAN path ──────────────────────────────────────────────────────
-    def _run_realesrgan(self, img: np.ndarray) -> np.ndarray:
+    def _run_realesrgan(self, img: np.ndarray):
         try:
             output, _ = self._upsampler.enhance(img, outscale=SCALE)
-            return output
+            return output, "native"
         except Exception as exc:
+            msg = str(exc).lower()
+            can_retry_cpu = (
+                self._torch is not None
+                and self._torch.cuda.is_available()
+                and "out of memory" in msg
+            )
+
+            if can_retry_cpu:
+                logger.warning("Real-ESRGAN CUDA OOM — retrying on CPU")
+                try:
+                    if self._upsampler_cpu is None:
+                        self._upsampler_cpu = self._build_realesrgan_upsampler("cpu")
+                    output, _ = self._upsampler_cpu.enhance(img, outscale=SCALE)
+                    return output, "native-cpu-fallback"
+                except Exception as cpu_exc:
+                    logger.warning("Real-ESRGAN CPU retry failed (%s) – fallback", cpu_exc)
+
             logger.warning("Real-ESRGAN inference error (%s) – fallback", exc)
-            return self._run_opencv(img, profile="realesrgan")
+            return self._run_opencv(img, profile="realesrgan"), "fallback-opencv"
 
     def _run_spandrel(self, img: np.ndarray, model_name: str):
         if self._torch is None:
