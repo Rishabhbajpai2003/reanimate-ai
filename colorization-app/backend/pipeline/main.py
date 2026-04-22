@@ -1,12 +1,28 @@
-"""
-Pipeline Controller — orchestrates all restoration modules sequentially.
-"""
-
+import sys
 import time
 import logging
 from pathlib import Path
 from typing import Any, Optional, Dict, List
 
+# ─── Monkeypatching & Compatibility Fixes ─────────────────────────────────────
+# 1. Fix torchvision compatibility for basicsr (0.15+)
+# torchvision 0.15+ no longer exposes the legacy
+# `torchvision.transforms.functional_tensor` module, but basicsr still imports
+# that path. Alias it to `torchvision.transforms.functional` so those imports
+# continue to resolve without changing basicsr.
+import torchvision.transforms.functional as tf_f
+sys.modules['torchvision.transforms.functional_tensor'] = tf_f
+
+# 2. Fix torch.load for newer versions (2.0+)
+import torch
+_original_load = torch.load
+def _safe_load(*args, **kwargs):
+    if 'weights_only' not in kwargs:
+        kwargs['weights_only'] = False
+    return _original_load(*args, **kwargs)
+torch.load = _safe_load
+
+# ─── Pipeline Imports ─────────────────────────────────────────────────────────
 from .restore   import RestoreModule
 from .super_res import SuperResModule
 from .colorize  import ColorizeModule

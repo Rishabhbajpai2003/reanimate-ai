@@ -67,3 +67,10 @@ _preset_*
 _ai_*
 _frame_*
 _m2_*
+
+# ReAnimateAI generated outputs and local external clones
+colorization-app/backend/static/results/tmp/
+colorization-app/backend/static/results/*.mp4
+colorization-app/backend/static/results/*.gif
+colorization-app/CodeFormer/
+colorization-app/SadTalker/

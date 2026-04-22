@@ -78,6 +78,8 @@ class SuperResModule:
         candidates = [
             (self._models_dir / "RealESRGAN_x2plus.pth", 2, 23),
             (self._models_dir / "RealESRGAN_x4plus.pth", 4, 23),
+            (self._models_dir / "realesrgan" / "RealESRGAN_x2plus.pth", 2, 23),
+            (self._models_dir / "realesrgan" / "RealESRGAN_x4plus.pth", 4, 23),
         ]
         for path, model_scale, num_blocks in candidates:
             if path.exists():
@@ -114,7 +116,6 @@ class SuperResModule:
     def _try_load_realesrgan(self):
         try:
             import torch
-
             resolved = self._resolve_realesrgan_checkpoint()
             if resolved is None:
                 logger.info("Real-ESRGAN checkpoint not found (x2/x4) – using OpenCV fallback")
