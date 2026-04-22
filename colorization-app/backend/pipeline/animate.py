@@ -264,7 +264,7 @@ class AnimateModule:
                 "--still",                       # minimal head motion
                 "--size", "256",                 # ⬅️ BIGGEST SPEED BOOST
                 "--expression_scale", "0.6",     # less computation
-                "--enhancer", "none",            # disable GFPGAN (very important)
+                # "--enhancer", "none",            # disable GFPGAN (very important)
             ]
 
             # 🔥 isolate environment
