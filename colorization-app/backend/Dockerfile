@@ -57,14 +57,14 @@ USER appuser
 # ─── Runtime Config ────────────────────────────────────────────────────────────
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PORT=5000 \
+    PORT=7860 \
     FLASK_ENV=production
 
-EXPOSE 5000
+EXPOSE 7860
 
 # Gunicorn: 2 workers, 1 thread each (heavy GPU models need dedicated workers)
 CMD ["gunicorn", \
-     "--bind", "0.0.0.0:5000", \
+     "--bind", "0.0.0.0:7860", \
      "--workers", "2", \
      "--threads", "1", \
      "--timeout", "300", \
