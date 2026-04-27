@@ -46,6 +46,10 @@ COPY . .
 # Ensure output directories exist
 RUN mkdir -p static/uploads static/results models
 
+# Download necessary models during build (This ensures the app works immediately)
+# We do this as root before switching users to ensure path permissions are correct
+RUN python download_models.py --all
+
 # Non-root user for security
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
 USER appuser
